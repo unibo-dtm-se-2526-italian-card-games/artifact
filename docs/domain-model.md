@@ -98,7 +98,7 @@ Design choices:
 - **Per-game rules behind `Game`.** `Match` delegates every game-specific decision to its `Game`. Adding Briscola does not change `Match` (FR-01).
 - **Ports are `typing.Protocol`s.** `Game` and `AIStrategy` are matched by shape, so adapters (LLM, Prolog) do not inherit from an engine class. Mypy checks the signatures (NFR-01).
 - **Legal moves come from the player view.** `Game.legal_moves(view)` uses the same `PlayerView` a bot receives: the seat, its hand and the cards on the table. That is enough for follow-suit rules, and it guarantees a bot and the legality check see the same information (FR-04, FR-06).
-- **`Game` grows with the rules.** Only `player_count` and `legal_moves` exist so far. `trick_winner`, `score_round` and `outcomes` are added in steps 7 to 10, each with its tests.
+- **`Game` grows with the rules.** `player_count`, `legal_moves` and `trick_winner` exist so far. `score_round` and `outcomes` are added in steps 8 to 10, each with its tests. `trick_winner` takes the four moves of a complete trick and raises an error otherwise. Whose turn it is belongs to `Match`, not to `Game.legal_moves`.
 
 ### 3.2 Lobby
 
