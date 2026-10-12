@@ -18,6 +18,9 @@ class AnyCardGame:
     def legal_moves(self, view: PlayerView) -> tuple[Move, ...]:
         return tuple(Move(view.seat, card) for card in view.hand)
 
+    def trick_winner(self, trick: tuple[Move, ...]) -> SeatIndex:
+        return trick[0].seat
+
 
 class FirstLegalMoveBot:
     """A fake strategy that always plays the first legal move."""
@@ -44,6 +47,16 @@ class NotAGame:
         return 2
 
 
+class GameWithoutTrickWinner:
+    """Has the first two game methods but not trick_winner."""
+
+    def player_count(self) -> int:
+        return 2
+
+    def legal_moves(self, view: PlayerView) -> tuple[Move, ...]:
+        return ()
+
+
 class NotAStrategy:
     def pick(self, view: PlayerView) -> Move:
         return Move(view.seat, view.hand[0])
@@ -59,6 +72,14 @@ class TestGame:
 
     def test_a_class_missing_a_method_is_not_a_game(self):
         assert not isinstance(NotAGame(), Game)
+
+    def test_a_class_without_trick_winner_is_not_a_game(self) -> None:
+        assert not isinstance(GameWithoutTrickWinner(), Game)
+
+    def test_names_the_winner_of_a_trick(self) -> None:
+        game: Game = AnyCardGame()
+        trick = (Move(SeatIndex(1), ACE_OF_COINS), Move(SeatIndex(0), THREE_OF_CUPS))
+        assert game.trick_winner(trick) == SeatIndex(1)
 
     def test_reports_how_many_seats_it_needs(self) -> None:
         game: Game = AnyCardGame()
