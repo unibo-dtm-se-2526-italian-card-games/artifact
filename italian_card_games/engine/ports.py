@@ -1,6 +1,6 @@
 from typing import Protocol, runtime_checkable
 
-from italian_card_games.engine.values import Move, PlayerView
+from italian_card_games.engine.values import Move, PlayerView, SeatIndex
 
 
 @runtime_checkable
@@ -13,6 +13,10 @@ class Game(Protocol):
 
     def legal_moves(self, view: PlayerView) -> tuple[Move, ...]:
         """The moves the viewing seat is allowed to make right now."""
+        ...
+
+    def trick_winner(self, trick: tuple[Move, ...]) -> SeatIndex:
+        """The seat that wins a complete trick, given its moves in play order."""
         ...
 
 
