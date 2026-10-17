@@ -84,8 +84,6 @@ Relations between contexts:
 | Entity | `Round` | Identity: its number within the match. Holds the hands, the dealer and its tricks. |
 | Entity | `Trick` | Identity: its position within the round. Holds the moves made. |
 | **Aggregate root** | `Match` | Identity: `MatchId`. The only object outside code talks to. It enforces every rule and invariant of its rounds and tricks. |
-| Domain service | `TrickResolver` | Decides the trick winner from the strength order (FR-08, FR-10). Specific to Matazza. |
-| Domain service | `StandingsCalculator` | Solo win and the `numLow` rules (FR-13 to FR-17). Specific to Matazza. |
 | Factory | `DeckFactory` | Builds a shuffled `Deck` from an injectable random source (FR-02, NFR-04). |
 | Factory | `MatchFactory` | Builds a `Match` for a game type and a number of seats. |
 | Port (interface) | `Game` | The rules of one game: player count, dealing, legal moves, trick winner, round scoring, end conditions (FR-01, FR-03). Implemented by `MatazzaRules` and `BriscolaRules`. |
@@ -99,6 +97,7 @@ Design choices:
 - **Ports are `typing.Protocol`s.** `Game` and `AIStrategy` are matched by shape, so adapters (LLM, Prolog) do not inherit from an engine class. Mypy checks the signatures (NFR-01).
 - **Legal moves come from the player view.** `Game.legal_moves(view)` uses the same `PlayerView` a bot receives: the seat, its hand and the cards on the table. That is enough for follow-suit rules, and it guarantees a bot and the legality check see the same information (FR-04, FR-06).
 - **`Game` grows with the rules.** `player_count`, `legal_moves`, `trick_winner`, `round_scores` and `solo_winner` exist so far. `outcomes` is added in steps 9 and 10, with its tests. `trick_winner` takes the four moves of a complete trick and raises an error otherwise. `round_scores` takes the cards each seat won, in seat order, and returns exact `Fraction` scores; it raises an error for a wrong pile count or a duplicate card. `solo_winner` takes the four round scores and returns the seat that wins alone (the other three score below 1.0), or `None` (FR-12, FR-13). Whose turn it is belongs to `Match`, not to `Game.legal_moves`.
+- **Matazza rules live on `MatazzaRules`, with no separate domain services.** The trick winner, round scores, solo win and standing points are plain methods of `MatazzaRules`, so there is no `TrickResolver` or `StandingsCalculator`. `standing_points(scores, holder)` is specific to Matazza and is not on the `Game` port yet; step 10 decides whether `Match` needs it there. It takes the four round scores and the seat dealt the 8 of spades (the holder, which cannot be recovered from the scores). It returns the points each seat earns, always two in total, and raises an error for three low scores, a wrong score count or a holder outside the table (FR-14 to FR-17).
 
 ### 3.2 Lobby
 
@@ -188,14 +187,10 @@ classDiagram
         +solo_winner(scores) SeatIndex
         +outcomes(match) list~Outcome~
     }
-    class MatazzaRules
+    class MatazzaRules {
+        +standing_points(scores, holder) tuple~int~
+    }
     class BriscolaRules
-    class TrickResolver {
-        <<domain service>>
-    }
-    class StandingsCalculator {
-        <<domain service>>
-    }
     class AIStrategy {
         <<interface>>
         +choose_move(view) Move
@@ -222,8 +217,6 @@ classDiagram
     Match --> Game : delegates rules to
     Game <|.. MatazzaRules
     Game <|.. BriscolaRules
-    MatazzaRules ..> TrickResolver
-    MatazzaRules ..> StandingsCalculator
     Game ..> RoundScore
     Game ..> PlayerView
     Match ..> PlayerView : builds
@@ -316,11 +309,11 @@ classDiagram
 |---|---|---|
 | A deck has exactly 40 distinct cards. | `Deck` | FR-02 |
 | An illegal move is rejected and the state is unchanged. | `Match.play` using `Game.legal_moves` | FR-05, FR-09 |
-| The trick winner holds the highest-strength card of the led suit. | `TrickResolver` | FR-08, FR-10 |
+| The trick winner holds the highest-strength card of the led suit. | `MatazzaRules.trick_winner` | FR-08, FR-10 |
 | The first leader is the seat after the dealer, and the dealer rotates each round. | `Match` when it starts a round | FR-11 |
-| The four round scores sum to exactly 32/3. | `Game.score_round`, with `RoundScore` as a fraction | FR-12 |
-| A solo win is checked before any standing points. | `StandingsCalculator` | FR-13 |
-| `numLow == 3` is unreachable and raises an error. | `StandingsCalculator` | FR-17 |
+| The four round scores sum to exactly 32/3. | `Game.round_scores`, which returns exact `Fraction`s | FR-12 |
+| A solo win is checked before any standing points. | `Game.solo_winner`, called by `Match` first | FR-13 |
+| `numLow == 3` is unreachable and raises an error. | `MatazzaRules.standing_points` | FR-17 |
 | The end conditions are checked every time points are awarded. | `Match`, through `Game.outcomes` | FR-18 |
 | Every seat ends with exactly one outcome, win or loss. | `Match` when it emits `GameEnded` | FR-19 |
 | A player view never contains another seat's hand. | `Match.view_for` | FR-06 |
