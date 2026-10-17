@@ -1,5 +1,7 @@
 """Contract tests for the Game and AIStrategy ports (FR-01, FR-04, FR-21)."""
 
+from fractions import Fraction
+
 from italian_card_games.engine.cards import Card, Rank, Suit
 from italian_card_games.engine.ports import AIStrategy, Game
 from italian_card_games.engine.values import Move, PlayerView, SeatIndex
@@ -20,6 +22,12 @@ class AnyCardGame:
 
     def trick_winner(self, trick: tuple[Move, ...]) -> SeatIndex:
         return trick[0].seat
+
+    def round_scores(self, won: tuple[tuple[Card, ...], ...]) -> tuple[Fraction, ...]:
+        return tuple(Fraction(len(cards)) for cards in won)
+
+    def solo_winner(self, scores: tuple[Fraction, ...]) -> SeatIndex | None:
+        return None
 
 
 class FirstLegalMoveBot:
@@ -57,6 +65,19 @@ class GameWithoutTrickWinner:
         return ()
 
 
+class GameWithoutScoring:
+    """Has the trick methods but neither round_scores nor solo_winner."""
+
+    def player_count(self) -> int:
+        return 2
+
+    def legal_moves(self, view: PlayerView) -> tuple[Move, ...]:
+        return ()
+
+    def trick_winner(self, trick: tuple[Move, ...]) -> SeatIndex:
+        return trick[0].seat
+
+
 class NotAStrategy:
     def pick(self, view: PlayerView) -> Move:
         return Move(view.seat, view.hand[0])
@@ -75,6 +96,18 @@ class TestGame:
 
     def test_a_class_without_trick_winner_is_not_a_game(self) -> None:
         assert not isinstance(GameWithoutTrickWinner(), Game)
+
+    def test_a_class_without_scoring_methods_is_not_a_game(self) -> None:
+        assert not isinstance(GameWithoutScoring(), Game)
+
+    def test_scores_a_round_from_the_cards_each_seat_won(self) -> None:
+        game: Game = AnyCardGame()
+        won = ((ACE_OF_COINS, THREE_OF_CUPS), (EIGHT_OF_SPADES,))
+        assert game.round_scores(won) == (Fraction(2), Fraction(1))
+
+    def test_reports_no_solo_winner_when_the_game_has_none(self) -> None:
+        game: Game = AnyCardGame()
+        assert game.solo_winner((Fraction(1), Fraction(1))) is None
 
     def test_names_the_winner_of_a_trick(self) -> None:
         game: Game = AnyCardGame()
