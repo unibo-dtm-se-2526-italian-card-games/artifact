@@ -98,7 +98,7 @@ Design choices:
 - **Per-game rules behind `Game`.** `Match` delegates every game-specific decision to its `Game`. Adding Briscola does not change `Match` (FR-01).
 - **Ports are `typing.Protocol`s.** `Game` and `AIStrategy` are matched by shape, so adapters (LLM, Prolog) do not inherit from an engine class. Mypy checks the signatures (NFR-01).
 - **Legal moves come from the player view.** `Game.legal_moves(view)` uses the same `PlayerView` a bot receives: the seat, its hand and the cards on the table. That is enough for follow-suit rules, and it guarantees a bot and the legality check see the same information (FR-04, FR-06).
-- **`Game` grows with the rules.** `player_count`, `legal_moves` and `trick_winner` exist so far. `score_round` and `outcomes` are added in steps 8 to 10, each with its tests. `trick_winner` takes the four moves of a complete trick and raises an error otherwise. Whose turn it is belongs to `Match`, not to `Game.legal_moves`.
+- **`Game` grows with the rules.** `player_count`, `legal_moves`, `trick_winner`, `round_scores` and `solo_winner` exist so far. `outcomes` is added in steps 9 and 10, with its tests. `trick_winner` takes the four moves of a complete trick and raises an error otherwise. `round_scores` takes the cards each seat won, in seat order, and returns exact `Fraction` scores; it raises an error for a wrong pile count or a duplicate card. `solo_winner` takes the four round scores and returns the seat that wins alone (the other three score below 1.0), or `None` (FR-12, FR-13). Whose turn it is belongs to `Match`, not to `Game.legal_moves`.
 
 ### 3.2 Lobby
 
@@ -184,7 +184,8 @@ classDiagram
         +player_count() int
         +legal_moves(view) list~Move~
         +trick_winner(trick) SeatIndex
-        +score_round(round) list~RoundScore~
+        +round_scores(won) tuple~Fraction~
+        +solo_winner(scores) SeatIndex
         +outcomes(match) list~Outcome~
     }
     class MatazzaRules
