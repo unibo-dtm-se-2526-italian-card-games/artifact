@@ -18,11 +18,15 @@ def points(scores: tuple[Fraction, ...], holder: int) -> tuple[int, ...]:
 
 
 class TestNoLowScores:
-    def test_fr14_example_a_the_holder_and_the_top_scorer_take_one_point_each(self) -> None:
+    def test_fr14_example_a_the_holder_and_the_top_scorer_take_one_point_each(
+        self,
+    ) -> None:
         scores = thirds(3, 6, 12, 11)  # P1=1.00, P2=2.00, P3=4.00, P4=3.67
         assert points(scores, holder=3) == (0, 0, 1, 1)
 
-    def test_fr14_example_b_a_tie_for_the_top_gives_the_holder_both_points(self) -> None:
+    def test_fr14_example_b_a_tie_for_the_top_gives_the_holder_both_points(
+        self,
+    ) -> None:
         scores = thirds(9, 9, 11, 3)  # P1=3.00, P2=3.00, P3=3.67, P4=1.00
         assert points(scores, holder=2) == (0, 0, 2, 0)
 
