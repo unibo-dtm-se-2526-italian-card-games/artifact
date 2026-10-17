@@ -1,4 +1,6 @@
-from italian_card_games.engine.cards import Rank
+from fractions import Fraction
+
+from italian_card_games.engine.cards import Card, Rank
 from italian_card_games.engine.values import Move, PlayerView, SeatIndex
 
 PLAYER_COUNT = 4
@@ -9,6 +11,16 @@ _STRENGTH = {
     value: len(_RANKS_BY_STRENGTH) - position
     for position, value in enumerate(_RANKS_BY_STRENGTH)
 }
+
+
+# FR-12: round score value of a card, by rank. Ranks 4, 5, 6, 7 are worth nothing.
+_ONE_THIRD = Fraction(1, 3)
+_SCORE_BY_RANK = {
+    1: Fraction(1),
+    **{value: _ONE_THIRD for value in (3, 2, 10, 9, 8)},
+    **{value: Fraction(0) for value in (4, 5, 6, 7)},
+}
+_LOW_SCORE_LIMIT = Fraction(1)
 
 
 def _strength(rank: Rank) -> int:
@@ -43,3 +55,28 @@ class MatazzaRules:
         led_suit = trick[0].card.suit
         led_moves = (move for move in trick if move.card.suit == led_suit)
         return max(led_moves, key=lambda move: _strength(move.card.rank)).seat
+
+    def round_scores(self, won: tuple[tuple[Card, ...], ...]) -> tuple[Fraction, ...]:
+        """FR-12: each seat's score is the sum of the values of the cards it won."""
+        if len(won) != PLAYER_COUNT:
+            raise ValueError(f"a round has {PLAYER_COUNT} piles, got {len(won)}")
+        all_cards = [card for pile in won for card in pile]
+        if len(set(all_cards)) != len(all_cards):
+            raise ValueError("a card cannot be won twice in a round")
+        return tuple(
+            sum((_SCORE_BY_RANK[card.rank.value] for card in pile), Fraction(0))
+            for pile in won
+        )
+
+    def solo_winner(self, scores: tuple[Fraction, ...]) -> SeatIndex | None:
+        """FR-13: the seat wins alone if the other three each score below 1.0.
+
+        Exactly 1.0 is not below 1.0, so it blocks the solo win.
+        """
+        if len(scores) != PLAYER_COUNT:
+            raise ValueError(f"a round has {PLAYER_COUNT} scores, got {len(scores)}")
+        for seat in range(PLAYER_COUNT):
+            others = scores[:seat] + scores[seat + 1 :]
+            if all(other < _LOW_SCORE_LIMIT for other in others):
+                return SeatIndex(seat)
+        return None
