@@ -26,7 +26,7 @@ Words are used with exactly one meaning in code, tests and documents. Italian te
 | Round score | `RoundScore` | Points a seat gets from the cards it captured in one round. Exact fraction. |
 | Standing points | `StandingPoints` | Penalty points accumulated across the rounds of a match. Reaching the limits ends the match. |
 | Cursed card | | In Matazza, the 8 of spades. Its holder is relevant when standing points are awarded. |
-| Solo win | | In Matazza, a round in which exactly one seat scores more than 1.0 and the others 1.0 or less. That seat wins the match. |
+| Solo win | | In Matazza, a round in which three seats each score less than 1.0 (exactly 1.0 does not count). That seat wins the match. |
 | Outcome | `Outcome` | `WIN` or `LOSS` for a seat at the end of a match (FR-19). |
 | Player view | `PlayerView` | What one seat may see of the match: its own hand and public information (FR-06). |
 | Domain event | `DomainEvent` | A fact that happened in a match (e.g. `TrickWon`). Other parts of the system react to it. |
