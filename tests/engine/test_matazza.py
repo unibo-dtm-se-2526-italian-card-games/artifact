@@ -182,7 +182,9 @@ class TestRoundScores:
         won = a_full_deal()
         reordered = (won[2], won[0], won[3], won[1])
         scores = MatazzaRules().round_scores(reordered)
-        assert scores == tuple(MatazzaRules().round_scores(won)[i] for i in (2, 0, 3, 1))
+        assert scores == tuple(
+            MatazzaRules().round_scores(won)[i] for i in (2, 0, 3, 1)
+        )
 
     def test_fr12_the_four_scores_of_a_round_sum_to_32_thirds(self) -> None:
         scores = MatazzaRules().round_scores(a_full_deal())
