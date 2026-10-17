@@ -80,3 +80,38 @@ class MatazzaRules:
             if all(other < _LOW_SCORE_LIMIT for other in others):
                 return SeatIndex(seat)
         return None
+
+    def standing_points(
+        self, scores: tuple[Fraction, ...], holder: SeatIndex
+    ) -> tuple[int, ...]:
+        """FR-14 to FR-17: the standing points each seat earns, by seat order.
+
+        `holder` is the seat dealt the 8 of spades. The cases depend on `numLow`,
+        the number of scores below 1.0.
+        """
+        if len(scores) != PLAYER_COUNT:
+            raise ValueError(f"a round has {PLAYER_COUNT} scores, got {len(scores)}")
+        if holder.value >= PLAYER_COUNT:
+            raise ValueError(f"holder seat {holder.value} is out of range")
+        low = [seat for seat, score in enumerate(scores) if score < _LOW_SCORE_LIMIT]
+        awarded = [0] * PLAYER_COUNT
+        if len(low) == 0:
+            awarded[holder.value] += 1
+            others = sorted(
+                (seat for seat in range(PLAYER_COUNT) if seat != holder.value),
+                key=lambda seat: scores[seat],
+                reverse=True,
+            )
+            if scores[others[0]] == scores[others[1]]:
+                awarded[holder.value] += 1
+            else:
+                awarded[others[0]] += 1
+        elif len(low) == 1:
+            awarded[low[0]] += 1
+            awarded[holder.value] += 1
+        elif len(low) == 2:
+            for seat in low:
+                awarded[seat] += 1
+        else:
+            raise ValueError("three low scores is a solo win, not a standings case")
+        return tuple(awarded)
