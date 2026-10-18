@@ -80,7 +80,7 @@ Relations between contexts:
 | Value object | `StandingPoints` | A non-negative integer per seat. |
 | Value object | `Outcome` | `WIN` or `LOSS`. |
 | Value object | `PlayerView` | Own hand plus public information. Built by the match (FR-06). |
-| Entity | `Round` | Identity: its number within the match. Holds the hands, the dealer and its tricks. |
+| Entity | `Round` | Holds the hands, the dealer, the leader, the trick in play and the cards each seat has won. It validates each move against the `Game` and resolves a trick when it is complete. |
 | Entity | `Trick` | Identity: its position within the round. Holds the moves made. |
 | **Aggregate root** | `Match` | Identity: `MatchId`. The only object outside code talks to. It enforces every rule and invariant of its rounds and tricks. |
 | Factory | `DeckFactory` | Builds a shuffled `Deck` from an injectable random source (FR-02, NFR-04). |
@@ -137,8 +137,13 @@ classDiagram
     }
     class Round {
         <<entity>>
-        +int number
         +SeatIndex dealer
+        +SeatIndex leader
+        +deal(deck, dealer, player_count) Round
+        +play(move, game)
+        +view_for(seat) PlayerView
+        +scores(game) tuple~Fraction~
+        +is_over() bool
     }
     class Trick {
         <<entity>>
@@ -180,7 +185,7 @@ classDiagram
         +trick_winner(trick) SeatIndex
         +round_scores(won) tuple~Fraction~
         +solo_winner(scores) SeatIndex
-        +outcomes(match) list~Outcome~
+        +outcomes(standing_totals) tuple~Outcome~
     }
     class MatazzaRules {
         +standing_points(scores, holder) tuple~int~
