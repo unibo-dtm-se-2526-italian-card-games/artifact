@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from fractions import Fraction
 
 from italian_card_games.engine.cards import DECK_SIZE, Card, Deck
 from italian_card_games.engine.ports import Game
@@ -37,6 +38,23 @@ class Round:
             return self.leader
         return SeatIndex((self.trick[-1].seat.value + 1) % len(self.hands))
 
+    @property
+    def is_over(self) -> bool:
+        """FR-12: the round ends when every card has been played."""
+        return not any(self.hands)
+
+    def view_for(self, seat: SeatIndex) -> PlayerView:
+        """FR-06: what one seat may see, its own hand and the trick in play."""
+        if seat.value >= len(self.hands):
+            raise ValueError(f"seat {seat.value} is out of range")
+        return PlayerView(seat, self.hands[seat.value], self.trick)
+
+    def scores(self, game: Game) -> tuple[Fraction, ...]:
+        """FR-12: each seat's score from the cards it won, once the round is over."""
+        if not self.is_over:
+            raise ValueError("the round is not over yet")
+        return game.round_scores(self.won)
+
     def play(self, move: Move, game: Game) -> None:
         """FR-05, FR-09, FR-10: play a card, and resolve the trick when it is complete.
 
@@ -45,7 +63,7 @@ class Round:
         seat = move.seat
         if seat != self.current_seat:
             raise IllegalMoveError(f"it is seat {self.current_seat.value}'s turn")
-        view = PlayerView(seat, self.hands[seat.value], self.trick)
+        view = self.view_for(seat)
         if move not in game.legal_moves(view):
             raise IllegalMoveError(f"{move.card} is not a legal move for this seat")
         hands = list(self.hands)
