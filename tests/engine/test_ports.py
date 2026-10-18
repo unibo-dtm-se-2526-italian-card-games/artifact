@@ -4,7 +4,7 @@ from fractions import Fraction
 
 from italian_card_games.engine.cards import Card, Rank, Suit
 from italian_card_games.engine.ports import AIStrategy, Game
-from italian_card_games.engine.values import Move, PlayerView, SeatIndex
+from italian_card_games.engine.values import Move, Outcome, PlayerView, SeatIndex
 
 EIGHT_OF_SPADES = Card(Suit.SPADE, Rank(8))
 ACE_OF_COINS = Card(Suit.DENARI, Rank(1))
@@ -27,6 +27,9 @@ class AnyCardGame:
         return tuple(Fraction(len(cards)) for cards in won)
 
     def solo_winner(self, scores: tuple[Fraction, ...]) -> SeatIndex | None:
+        return None
+
+    def outcomes(self, standing_totals: tuple[int, ...]) -> tuple[Outcome, ...] | None:
         return None
 
 

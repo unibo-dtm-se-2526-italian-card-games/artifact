@@ -1,9 +1,13 @@
 from fractions import Fraction
 
 from italian_card_games.engine.cards import Card, Rank
-from italian_card_games.engine.values import Move, PlayerView, SeatIndex
+from italian_card_games.engine.values import Move, Outcome, PlayerView, SeatIndex
 
 PLAYER_COUNT = 4
+
+# FR-18: standing totals that end the game.
+_LOSING_TOTAL = 12
+_PAIR_LOSING_TOTAL = 6
 
 # FR-08: card strength in a trick, strongest first.
 _RANKS_BY_STRENGTH = (3, 2, 1, 10, 9, 8, 7, 6, 5, 4)
@@ -115,3 +119,20 @@ class MatazzaRules:
         else:
             raise ValueError("three low scores is a solo win, not a standings case")
         return tuple(awarded)
+
+    def outcomes(self, standing_totals: tuple[int, ...]) -> tuple[Outcome, ...] | None:
+        """FR-18, FR-19: the outcome of each seat if the game is over, else None.
+
+        A seat with 12 or more standing points loses alone. Otherwise, if two or
+        more seats have 6 or more, they all lose. Everyone else wins.
+        """
+        if len(standing_totals) != PLAYER_COUNT:
+            raise ValueError(
+                f"a game has {PLAYER_COUNT} totals, got {len(standing_totals)}"
+            )
+        losers = [t >= _LOSING_TOTAL for t in standing_totals]
+        if not any(losers):
+            losers = [t >= _PAIR_LOSING_TOTAL for t in standing_totals]
+            if sum(losers) < 2:
+                return None
+        return tuple(Outcome.LOSS if lost else Outcome.WIN for lost in losers)
