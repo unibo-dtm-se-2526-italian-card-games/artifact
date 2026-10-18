@@ -23,7 +23,7 @@ Words are used with exactly one meaning in code, tests and documents. Italian te
 | Led suit | | The suit of the first card of a trick. |
 | Round | `Round` | One deal of the whole deck, played out in tricks until all hands are empty. |
 | Dealer | | The seat that deals a round. It rotates each round (FR-11). |
-| Round score | `RoundScore` | Points a seat gets from the cards it captured in one round. Exact fraction. |
+| Round score | | Points a seat gets from the cards it captured in one round. A `Fraction`, never a float (FR-12). |
 | Standing points | `StandingPoints` | Penalty points accumulated across the rounds of a match. Reaching the limits ends the match. |
 | Cursed card | | In Matazza, the 8 of spades. Its holder is relevant when standing points are awarded. |
 | Solo win | | In Matazza, a round in which three seats each score less than 1.0 (exactly 1.0 does not count). That seat wins the match. |
@@ -77,7 +77,6 @@ Relations between contexts:
 | Value object | `Hand` | The unplayed cards of a seat. |
 | Value object | `SeatIndex` | A number from 0 to player count minus 1. |
 | Value object | `Move` | A seat and a card. |
-| Value object | `RoundScore` | Exact fraction (`fractions.Fraction`), never a float (FR-12). |
 | Value object | `StandingPoints` | A non-negative integer per seat. |
 | Value object | `Outcome` | `WIN` or `LOSS`. |
 | Value object | `PlayerView` | Own hand plus public information. Built by the match (FR-06). |
@@ -174,10 +173,6 @@ classDiagram
     class PlayerView {
         <<value object>>
     }
-    class RoundScore {
-        <<value object>>
-        +Fraction value
-    }
     class Game {
         <<interface>>
         +player_count() int
@@ -217,7 +212,6 @@ classDiagram
     Match --> Game : delegates rules to
     Game <|.. MatazzaRules
     Game <|.. BriscolaRules
-    Game ..> RoundScore
     Game ..> PlayerView
     Match ..> PlayerView : builds
     Match ..> DomainEvent : emits
