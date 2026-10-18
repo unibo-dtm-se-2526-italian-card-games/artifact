@@ -2,7 +2,7 @@ from fractions import Fraction
 from typing import Protocol, runtime_checkable
 
 from italian_card_games.engine.cards import Card
-from italian_card_games.engine.values import Move, PlayerView, SeatIndex
+from italian_card_games.engine.values import Move, Outcome, PlayerView, SeatIndex
 
 
 @runtime_checkable
@@ -27,6 +27,10 @@ class Game(Protocol):
 
     def solo_winner(self, scores: tuple[Fraction, ...]) -> SeatIndex | None:
         """The seat that wins the whole game from these round scores, or None."""
+        ...
+
+    def outcomes(self, standing_totals: tuple[int, ...]) -> tuple[Outcome, ...] | None:
+        """Each seat's win or loss if the game is over after these totals, else None."""
         ...
 
 
