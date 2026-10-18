@@ -43,9 +43,7 @@ class TestHands:
 
 
 class TestFirstLeader:
-    @pytest.mark.parametrize(
-        ("dealer", "leader"), [(0, 1), (1, 2), (2, 3), (3, 0)]
-    )
+    @pytest.mark.parametrize(("dealer", "leader"), [(0, 1), (1, 2), (2, 3), (3, 0)])
     def test_fr11_the_first_leader_is_the_seat_after_the_dealer(
         self, dealer: int, leader: int
     ) -> None:
