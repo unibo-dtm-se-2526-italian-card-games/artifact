@@ -23,7 +23,7 @@ Words are used with exactly one meaning in code, tests and documents. Italian te
 | Led suit | | The suit of the first card of a trick. |
 | Round | `Round` | One deal of the whole deck, played out in tricks until all hands are empty. |
 | Dealer | | The seat that deals a round. It rotates each round (FR-11). |
-| Round score | `RoundScore` | Points a seat gets from the cards it captured in one round. Exact fraction. |
+| Round score | | Points a seat gets from the cards it captured in one round. A `Fraction`, never a float (FR-12). |
 | Standing points | `StandingPoints` | Penalty points accumulated across the rounds of a match. Reaching the limits ends the match. |
 | Cursed card | | In Matazza, the 8 of spades. Its holder is relevant when standing points are awarded. |
 | Solo win | | In Matazza, a round in which three seats each score less than 1.0 (exactly 1.0 does not count). That seat wins the match. |
@@ -77,11 +77,10 @@ Relations between contexts:
 | Value object | `Hand` | The unplayed cards of a seat. |
 | Value object | `SeatIndex` | A number from 0 to player count minus 1. |
 | Value object | `Move` | A seat and a card. |
-| Value object | `RoundScore` | Exact fraction (`fractions.Fraction`), never a float (FR-12). |
 | Value object | `StandingPoints` | A non-negative integer per seat. |
 | Value object | `Outcome` | `WIN` or `LOSS`. |
 | Value object | `PlayerView` | Own hand plus public information. Built by the match (FR-06). |
-| Entity | `Round` | Identity: its number within the match. Holds the hands, the dealer and its tricks. |
+| Entity | `Round` | Holds the hands, the dealer, the leader, the trick in play and the cards each seat has won. It validates each move against the `Game` and resolves a trick when it is complete. |
 | Entity | `Trick` | Identity: its position within the round. Holds the moves made. |
 | **Aggregate root** | `Match` | Identity: `MatchId`. The only object outside code talks to. It enforces every rule and invariant of its rounds and tricks. |
 | Factory | `DeckFactory` | Builds a shuffled `Deck` from an injectable random source (FR-02, NFR-04). |
@@ -138,8 +137,13 @@ classDiagram
     }
     class Round {
         <<entity>>
-        +int number
         +SeatIndex dealer
+        +SeatIndex leader
+        +deal(deck, dealer, player_count) Round
+        +play(move, game)
+        +view_for(seat) PlayerView
+        +scores(game) tuple~Fraction~
+        +is_over() bool
     }
     class Trick {
         <<entity>>
@@ -174,10 +178,6 @@ classDiagram
     class PlayerView {
         <<value object>>
     }
-    class RoundScore {
-        <<value object>>
-        +Fraction value
-    }
     class Game {
         <<interface>>
         +player_count() int
@@ -185,7 +185,7 @@ classDiagram
         +trick_winner(trick) SeatIndex
         +round_scores(won) tuple~Fraction~
         +solo_winner(scores) SeatIndex
-        +outcomes(match) list~Outcome~
+        +outcomes(standing_totals) tuple~Outcome~
     }
     class MatazzaRules {
         +standing_points(scores, holder) tuple~int~
@@ -217,7 +217,6 @@ classDiagram
     Match --> Game : delegates rules to
     Game <|.. MatazzaRules
     Game <|.. BriscolaRules
-    Game ..> RoundScore
     Game ..> PlayerView
     Match ..> PlayerView : builds
     Match ..> DomainEvent : emits
