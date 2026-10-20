@@ -32,6 +32,19 @@ class AnyCardGame:
     def outcomes(self, standing_totals: tuple[int, ...]) -> tuple[Outcome, ...] | None:
         return None
 
+    def standing_points(
+        self, scores: tuple[Fraction, ...], holder: SeatIndex
+    ) -> tuple[int, ...]:
+        awarded = [0] * len(scores)
+        awarded[holder.value] = 2
+        return tuple(awarded)
+
+    def round_holder(self, hands: tuple[tuple[Card, ...], ...]) -> SeatIndex | None:
+        for seat, hand in enumerate(hands):
+            if EIGHT_OF_SPADES in hand:
+                return SeatIndex(seat)
+        return None
+
 
 class FirstLegalMoveBot:
     """A fake strategy that always plays the first legal move."""
@@ -81,6 +94,28 @@ class GameWithoutScoring:
         return trick[0].seat
 
 
+class GameWithoutStandings:
+    """Has every method except standing_points and round_holder."""
+
+    def player_count(self) -> int:
+        return 2
+
+    def legal_moves(self, view: PlayerView) -> tuple[Move, ...]:
+        return ()
+
+    def trick_winner(self, trick: tuple[Move, ...]) -> SeatIndex:
+        return trick[0].seat
+
+    def round_scores(self, won: tuple[tuple[Card, ...], ...]) -> tuple[Fraction, ...]:
+        return ()
+
+    def solo_winner(self, scores: tuple[Fraction, ...]) -> SeatIndex | None:
+        return None
+
+    def outcomes(self, standing_totals: tuple[int, ...]) -> tuple[Outcome, ...] | None:
+        return None
+
+
 class NotAStrategy:
     def pick(self, view: PlayerView) -> Move:
         return Move(view.seat, view.hand[0])
@@ -102,6 +137,23 @@ class TestGame:
 
     def test_a_class_without_scoring_methods_is_not_a_game(self) -> None:
         assert not isinstance(GameWithoutScoring(), Game)
+
+    def test_a_class_without_standing_methods_is_not_a_game(self) -> None:
+        assert not isinstance(GameWithoutStandings(), Game)
+
+    def test_awards_standing_points_from_round_scores_and_the_holder(self) -> None:
+        game: Game = AnyCardGame()
+        scores = (Fraction(1), Fraction(2))
+        assert game.standing_points(scores, SeatIndex(1)) == (0, 2)
+
+    def test_names_the_holder_of_the_key_card_from_the_dealt_hands(self) -> None:
+        game: Game = AnyCardGame()
+        hands = ((ACE_OF_COINS,), (THREE_OF_CUPS, EIGHT_OF_SPADES))
+        assert game.round_holder(hands) == SeatIndex(1)
+
+    def test_reports_no_holder_when_the_key_card_is_not_dealt(self) -> None:
+        game: Game = AnyCardGame()
+        assert game.round_holder(((ACE_OF_COINS,), (THREE_OF_CUPS,))) is None
 
     def test_scores_a_round_from_the_cards_each_seat_won(self) -> None:
         game: Game = AnyCardGame()

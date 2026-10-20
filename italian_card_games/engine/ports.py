@@ -29,6 +29,16 @@ class Game(Protocol):
         """The seat that wins the whole game from these round scores, or None."""
         ...
 
+    def standing_points(
+        self, scores: tuple[Fraction, ...], holder: SeatIndex
+    ) -> tuple[int, ...]:
+        """The standing points each seat earns from a round, by seat order."""
+        ...
+
+    def round_holder(self, hands: tuple[tuple[Card, ...], ...]) -> SeatIndex | None:
+        """The seat dealt the key card of the game, or None if the game has none."""
+        ...
+
     def outcomes(self, standing_totals: tuple[int, ...]) -> tuple[Outcome, ...] | None:
         """Each seat's win or loss if the game is over after these totals, else None."""
         ...
