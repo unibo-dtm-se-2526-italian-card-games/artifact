@@ -42,7 +42,9 @@ class TestStart:
         assert all_cards_in_hands(first) == all_cards_in_hands(second)
 
     def test_nfr04_a_different_seed_deals_different_hands(self) -> None:
-        assert all_cards_in_hands(a_match(seed=7)) != all_cards_in_hands(a_match(seed=8))
+        assert all_cards_in_hands(a_match(seed=7)) != all_cards_in_hands(
+            a_match(seed=8)
+        )
 
     def test_a_new_match_has_no_standing_points_and_no_outcome(self) -> None:
         match = a_match()
