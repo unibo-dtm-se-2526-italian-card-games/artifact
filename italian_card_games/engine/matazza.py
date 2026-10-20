@@ -1,9 +1,12 @@
 from fractions import Fraction
 
-from italian_card_games.engine.cards import Card, Rank
+from italian_card_games.engine.cards import Card, Rank, Suit
 from italian_card_games.engine.values import Move, Outcome, PlayerView, SeatIndex
 
 PLAYER_COUNT = 4
+
+# FR-14: the card whose holder is relevant when standing points are awarded.
+_CURSED_CARD = Card(Suit.SPADE, Rank(8))
 
 # FR-18: standing totals that end the game.
 _LOSING_TOTAL = 12
@@ -82,6 +85,13 @@ class MatazzaRules:
         for seat in range(PLAYER_COUNT):
             others = scores[:seat] + scores[seat + 1 :]
             if all(other < _LOW_SCORE_LIMIT for other in others):
+                return SeatIndex(seat)
+        return None
+
+    def round_holder(self, hands: tuple[tuple[Card, ...], ...]) -> SeatIndex | None:
+        """FR-14, FR-15: the seat dealt the 8 of spades, or None if nobody holds it."""
+        for seat, hand in enumerate(hands):
+            if _CURSED_CARD in hand:
                 return SeatIndex(seat)
         return None
 
