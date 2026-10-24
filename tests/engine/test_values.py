@@ -46,8 +46,8 @@ class TestMove:
 
 
 class TestOutcome:
-    def test_is_either_win_or_loss(self):
-        assert {outcome.name for outcome in Outcome} == {"WIN", "LOSS"}
+    def test_is_win_loss_or_draw(self):
+        assert {outcome.name for outcome in Outcome} == {"WIN", "LOSS", "DRAW"}
 
 
 class TestPlayerView:
