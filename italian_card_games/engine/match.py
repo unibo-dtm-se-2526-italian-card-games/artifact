@@ -12,7 +12,13 @@ from italian_card_games.engine.events import (
     TrickWon,
 )
 from italian_card_games.engine.ports import Game
-from italian_card_games.engine.values import Move, Outcome, PlayerView, SeatIndex
+from italian_card_games.engine.values import (
+    Deal,
+    Move,
+    Outcome,
+    PlayerView,
+    SeatIndex,
+)
 
 
 class IllegalMoveError(ValueError):
@@ -37,8 +43,14 @@ class Round:
         if dealer.value >= player_count:
             raise ValueError(f"dealer seat {dealer.value} is out of range")
         hands = tuple(deck.cards[seat::player_count] for seat in range(player_count))
+        return cls.start(Deal(hands, (), None), dealer)
+
+    @classmethod
+    def start(cls, deal: Deal, dealer: SeatIndex) -> "Round":
+        """FR-11: begin a round from a deal, the seat after the dealer leads."""
+        player_count = len(deal.hands)
         leader = SeatIndex((dealer.value + 1) % player_count)
-        return cls(hands, dealer, leader, (), ((),) * player_count)
+        return cls(deal.hands, dealer, leader, (), ((),) * player_count)
 
     @property
     def current_seat(self) -> SeatIndex:
@@ -141,7 +153,7 @@ class Match:
     def _start_round(self, dealer: SeatIndex) -> None:
         """FR-02, FR-11, NFR-04: deal a fresh shuffle from the injected random source."""
         deck = DeckFactory.shuffled(self._rng)
-        self.round = Round.deal(deck, dealer, self._game.player_count())
+        self.round = Round.start(self._game.deal(deck), dealer)
         self._holder = self._game.round_holder(self.round.hands)
 
     def _end_round(self) -> list[DomainEvent]:
