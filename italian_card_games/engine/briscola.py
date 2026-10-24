@@ -1,7 +1,8 @@
-from italian_card_games.engine.cards import Rank, Suit
-from italian_card_games.engine.values import Move, PlayerView, SeatIndex
+from italian_card_games.engine.cards import Deck, Rank, Suit
+from italian_card_games.engine.values import Deal, Move, PlayerView, SeatIndex
 
 PLAYER_COUNT = 2
+HAND_SIZE = 3
 
 # FR-20: card strength in a trick, strongest first.
 _RANKS_BY_STRENGTH = (1, 3, 10, 9, 8, 7, 6, 5, 4, 2)
@@ -20,6 +21,18 @@ class BriscolaRules:
 
     def player_count(self) -> int:
         return PLAYER_COUNT
+
+    def deal(self, deck: Deck) -> Deal:
+        """FR-20: three cards each in turn, the rest is the stock, its last card is trump.
+
+        The last card of the stock is turned up and drawn last, so it names the trump.
+        """
+        dealt = HAND_SIZE * PLAYER_COUNT
+        hands = tuple(
+            deck.cards[seat:dealt:PLAYER_COUNT] for seat in range(PLAYER_COUNT)
+        )
+        stock = deck.cards[dealt:]
+        return Deal(hands, stock, stock[-1].suit)
 
     def legal_moves(self, view: PlayerView) -> tuple[Move, ...]:
         """FR-20: any card in hand may be played, there is no duty to follow suit."""
