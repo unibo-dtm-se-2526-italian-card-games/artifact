@@ -95,6 +95,15 @@ class TestTrickWinnerFollowSuit:
         )
         assert MatazzaRules().trick_winner(trick) == SeatIndex(3)
 
+    def test_fr10_a_trump_suit_given_to_matazza_is_ignored(self) -> None:
+        trick = (
+            move(0, Suit.COPPE, 4),
+            move(1, Suit.SPADE, 3),  # would win if SPADE were a trump
+            move(2, Suit.DENARI, 2),
+            move(3, Suit.COPPE, 5),
+        )
+        assert MatazzaRules().trick_winner(trick, Suit.SPADE) == SeatIndex(3)
+
     @pytest.mark.parametrize("played", [0, 1, 2, 3, 5])
     def test_rejects_a_trick_without_four_moves(self, played: int) -> None:
         seats = (0, 1, 2, 3, 0)[:played]
