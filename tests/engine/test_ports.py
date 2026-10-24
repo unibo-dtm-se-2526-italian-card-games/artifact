@@ -2,9 +2,15 @@
 
 from fractions import Fraction
 
-from italian_card_games.engine.cards import Card, Rank, Suit
+from italian_card_games.engine.cards import Card, Deck, DeckFactory, Rank, Suit
 from italian_card_games.engine.ports import AIStrategy, Game
-from italian_card_games.engine.values import Move, Outcome, PlayerView, SeatIndex
+from italian_card_games.engine.values import (
+    Deal,
+    Move,
+    Outcome,
+    PlayerView,
+    SeatIndex,
+)
 
 EIGHT_OF_SPADES = Card(Suit.SPADE, Rank(8))
 ACE_OF_COINS = Card(Suit.DENARI, Rank(1))
@@ -16,6 +22,9 @@ class AnyCardGame:
 
     def player_count(self) -> int:
         return 2
+
+    def deal(self, deck: Deck) -> Deal:
+        return Deal((deck.cards[:20], deck.cards[20:]), (), None)
 
     def legal_moves(self, view: PlayerView) -> tuple[Move, ...]:
         return tuple(Move(view.seat, card) for card in view.hand)
@@ -168,6 +177,13 @@ class TestGame:
         game: Game = AnyCardGame()
         trick = (Move(SeatIndex(1), ACE_OF_COINS), Move(SeatIndex(0), THREE_OF_CUPS))
         assert game.trick_winner(trick) == SeatIndex(1)
+
+    def test_deals_a_deck_into_hands_a_stock_and_a_trump(self) -> None:
+        game: Game = AnyCardGame()
+        deal = game.deal(DeckFactory.ordered())
+        assert [len(hand) for hand in deal.hands] == [20, 20]
+        assert deal.stock == ()
+        assert deal.trump is None
 
     def test_reports_how_many_seats_it_needs(self) -> None:
         game: Game = AnyCardGame()

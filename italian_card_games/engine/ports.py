@@ -1,8 +1,14 @@
 from fractions import Fraction
 from typing import Protocol, runtime_checkable
 
-from italian_card_games.engine.cards import Card
-from italian_card_games.engine.values import Move, Outcome, PlayerView, SeatIndex
+from italian_card_games.engine.cards import Card, Deck
+from italian_card_games.engine.values import (
+    Deal,
+    Move,
+    Outcome,
+    PlayerView,
+    SeatIndex,
+)
 
 
 @runtime_checkable
@@ -11,6 +17,10 @@ class Game(Protocol):
 
     def player_count(self) -> int:
         """How many seats a match of this game needs."""
+        ...
+
+    def deal(self, deck: Deck) -> Deal:
+        """Split a shuffled deck into the hands, the stock and the trump suit."""
         ...
 
     def legal_moves(self, view: PlayerView) -> tuple[Move, ...]:

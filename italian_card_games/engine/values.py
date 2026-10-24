@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from enum import Enum
 
-from italian_card_games.engine.cards import Card
+from italian_card_games.engine.cards import Card, Suit
 
 
 @dataclass(frozen=True, slots=True)
@@ -28,6 +28,15 @@ class Outcome(Enum):
 
     WIN = "win"
     LOSS = "loss"
+
+
+@dataclass(frozen=True, slots=True)
+class Deal:
+    """How a game deals a deck: a hand per seat, the stock left over, the trump suit."""
+
+    hands: tuple[tuple[Card, ...], ...]
+    stock: tuple[Card, ...]
+    trump: Suit | None
 
 
 @dataclass(frozen=True, slots=True)

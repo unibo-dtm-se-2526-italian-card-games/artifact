@@ -1,7 +1,13 @@
 from fractions import Fraction
 
-from italian_card_games.engine.cards import Card, Rank, Suit
-from italian_card_games.engine.values import Move, Outcome, PlayerView, SeatIndex
+from italian_card_games.engine.cards import Card, Deck, Rank, Suit
+from italian_card_games.engine.values import (
+    Deal,
+    Move,
+    Outcome,
+    PlayerView,
+    SeatIndex,
+)
 
 PLAYER_COUNT = 4
 
@@ -39,6 +45,11 @@ class MatazzaRules:
 
     def player_count(self) -> int:
         return PLAYER_COUNT
+
+    def deal(self, deck: Deck) -> Deal:
+        """FR-07: deal the whole deck evenly, so there is no stock and no trump."""
+        hands = tuple(deck.cards[seat::PLAYER_COUNT] for seat in range(PLAYER_COUNT))
+        return Deal(hands, (), None)
 
     def legal_moves(self, view: PlayerView) -> tuple[Move, ...]:
         """FR-09: follow the led suit if you hold it, otherwise play any card.
