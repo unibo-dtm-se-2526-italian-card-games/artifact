@@ -64,8 +64,13 @@ class MatazzaRules:
                 hand = same_suit
         return tuple(Move(view.seat, card) for card in hand)
 
-    def trick_winner(self, trick: tuple[Move, ...]) -> SeatIndex:
-        """FR-10: the highest-strength card of the led suit wins the trick."""
+    def trick_winner(
+        self, trick: tuple[Move, ...], trump: Suit | None = None
+    ) -> SeatIndex:
+        """FR-10: the highest-strength card of the led suit wins the trick.
+
+        Matazza has no trump suit, so `trump` is accepted and ignored.
+        """
         if len(trick) != PLAYER_COUNT:
             raise ValueError(f"a trick has {PLAYER_COUNT} moves, got {len(trick)}")
         if len({move.seat for move in trick}) != PLAYER_COUNT:

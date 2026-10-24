@@ -1,7 +1,7 @@
 from fractions import Fraction
 from typing import Protocol, runtime_checkable
 
-from italian_card_games.engine.cards import Card, Deck
+from italian_card_games.engine.cards import Card, Deck, Suit
 from italian_card_games.engine.values import (
     Deal,
     Move,
@@ -27,8 +27,13 @@ class Game(Protocol):
         """The moves the viewing seat is allowed to make right now."""
         ...
 
-    def trick_winner(self, trick: tuple[Move, ...]) -> SeatIndex:
-        """The seat that wins a complete trick, given its moves in play order."""
+    def trick_winner(
+        self, trick: tuple[Move, ...], trump: Suit | None = None
+    ) -> SeatIndex:
+        """The seat that wins a complete trick, given its moves in play order.
+
+        `trump` is the trump suit of the round, None for games without one.
+        """
         ...
 
     def round_scores(self, won: tuple[tuple[Card, ...], ...]) -> tuple[Fraction, ...]:

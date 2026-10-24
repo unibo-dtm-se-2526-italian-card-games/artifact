@@ -29,7 +29,9 @@ class AnyCardGame:
     def legal_moves(self, view: PlayerView) -> tuple[Move, ...]:
         return tuple(Move(view.seat, card) for card in view.hand)
 
-    def trick_winner(self, trick: tuple[Move, ...]) -> SeatIndex:
+    def trick_winner(
+        self, trick: tuple[Move, ...], trump: Suit | None = None
+    ) -> SeatIndex:
         return trick[0].seat
 
     def round_scores(self, won: tuple[tuple[Card, ...], ...]) -> tuple[Fraction, ...]:
