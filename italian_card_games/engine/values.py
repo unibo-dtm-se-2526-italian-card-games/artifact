@@ -41,11 +41,12 @@ class Deal:
 
 @dataclass(frozen=True, slots=True)
 class PlayerView:
-    """What one seat may see: its own hand and the moves already on the table."""
+    """What one seat may see: its hand, the moves on the table and the trump suit."""
 
     seat: SeatIndex
     hand: tuple[Card, ...]
     trick: tuple[Move, ...]
+    trump: Suit | None = None
 
     def __post_init__(self) -> None:
         if len(set(self.hand)) != len(self.hand):
