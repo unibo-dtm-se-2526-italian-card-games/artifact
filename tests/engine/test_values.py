@@ -62,6 +62,14 @@ class TestPlayerView:
         view = PlayerView(SeatIndex(0), (EIGHT_OF_SPADES,), ())
         assert view.trick == ()
 
+    def test_fr20_has_no_trump_suit_unless_the_game_names_one(self):
+        view = PlayerView(SeatIndex(0), (EIGHT_OF_SPADES,), ())
+        assert view.trump is None
+
+    def test_fr20_holds_the_trump_suit_of_the_round(self):
+        view = PlayerView(SeatIndex(0), (EIGHT_OF_SPADES,), (), Suit.DENARI)
+        assert view.trump == Suit.DENARI
+
     def test_rejects_duplicate_cards_in_the_hand(self):
         with pytest.raises(ValueError):
             PlayerView(SeatIndex(0), (EIGHT_OF_SPADES, EIGHT_OF_SPADES), ())
