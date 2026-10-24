@@ -28,6 +28,7 @@ class Outcome(Enum):
 
     WIN = "win"
     LOSS = "loss"
+    DRAW = "draw"
 
 
 @dataclass(frozen=True, slots=True)
