@@ -40,10 +40,6 @@ class Game(Protocol):
         """Each seat's score for a round, from the cards that seat won, by seat order."""
         ...
 
-    def solo_winner(self, scores: tuple[Fraction, ...]) -> SeatIndex | None:
-        """The seat that wins the whole game from these round scores, or None."""
-        ...
-
     def round_outcomes(
         self, scores: tuple[Fraction, ...]
     ) -> tuple[Outcome, ...] | None:

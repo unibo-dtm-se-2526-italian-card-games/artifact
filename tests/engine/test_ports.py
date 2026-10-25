@@ -37,9 +37,6 @@ class AnyCardGame:
     def round_scores(self, won: tuple[tuple[Card, ...], ...]) -> tuple[Fraction, ...]:
         return tuple(Fraction(len(cards)) for cards in won)
 
-    def solo_winner(self, scores: tuple[Fraction, ...]) -> SeatIndex | None:
-        return None
-
     def round_outcomes(
         self, scores: tuple[Fraction, ...]
     ) -> tuple[Outcome, ...] | None:
@@ -98,7 +95,7 @@ class GameWithoutTrickWinner:
 
 
 class GameWithoutScoring:
-    """Has the trick methods but neither round_scores nor solo_winner."""
+    """Has the trick methods but neither round_scores nor round_outcomes."""
 
     def player_count(self) -> int:
         return 2
@@ -125,7 +122,9 @@ class GameWithoutStandings:
     def round_scores(self, won: tuple[tuple[Card, ...], ...]) -> tuple[Fraction, ...]:
         return ()
 
-    def solo_winner(self, scores: tuple[Fraction, ...]) -> SeatIndex | None:
+    def round_outcomes(
+        self, scores: tuple[Fraction, ...]
+    ) -> tuple[Outcome, ...] | None:
         return None
 
     def outcomes(self, standing_totals: tuple[int, ...]) -> tuple[Outcome, ...] | None:
@@ -175,10 +174,6 @@ class TestGame:
         game: Game = AnyCardGame()
         won = ((ACE_OF_COINS, THREE_OF_CUPS), (EIGHT_OF_SPADES,))
         assert game.round_scores(won) == (Fraction(2), Fraction(1))
-
-    def test_reports_no_solo_winner_when_the_game_has_none(self) -> None:
-        game: Game = AnyCardGame()
-        assert game.solo_winner((Fraction(1), Fraction(1))) is None
 
     def test_reports_no_round_outcome_when_the_round_does_not_end_the_match(
         self,
