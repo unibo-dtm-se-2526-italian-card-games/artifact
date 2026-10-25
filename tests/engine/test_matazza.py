@@ -243,9 +243,7 @@ class TestRoundOutcomes:
     def test_fr13_a_solo_winner_wins_and_the_other_three_lose(self, seat: int) -> None:
         low = Fraction(1, 3)
         scores = tuple(Fraction(29, 3) if i == seat else low for i in range(4))
-        expected = tuple(
-            Outcome.WIN if i == seat else Outcome.LOSS for i in range(4)
-        )
+        expected = tuple(Outcome.WIN if i == seat else Outcome.LOSS for i in range(4))
         assert MatazzaRules().round_outcomes(scores) == expected
 
     def test_fr13_a_round_without_a_solo_winner_leaves_the_match_going(self) -> None:
