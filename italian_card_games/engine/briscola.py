@@ -91,3 +91,17 @@ class BriscolaRules:
         if first > second:
             return (Outcome.WIN, Outcome.LOSS)
         return (Outcome.LOSS, Outcome.WIN)
+
+    def round_holder(self, hands: tuple[tuple[Card, ...], ...]) -> SeatIndex | None:
+        """Unused by Briscola: no card matters for standing points, so None."""
+        return None
+
+    def standing_points(
+        self, scores: tuple[Fraction, ...], holder: SeatIndex
+    ) -> tuple[int, ...]:
+        """Unused by Briscola: one round decides the match, so no points are awarded."""
+        return (0,) * PLAYER_COUNT
+
+    def outcomes(self, standing_totals: tuple[int, ...]) -> tuple[Outcome, ...] | None:
+        """Unused by Briscola: with no standing totals the game is never over here."""
+        return None
