@@ -40,6 +40,11 @@ class AnyCardGame:
     def solo_winner(self, scores: tuple[Fraction, ...]) -> SeatIndex | None:
         return None
 
+    def round_outcomes(
+        self, scores: tuple[Fraction, ...]
+    ) -> tuple[Outcome, ...] | None:
+        return None
+
     def outcomes(self, standing_totals: tuple[int, ...]) -> tuple[Outcome, ...] | None:
         return None
 
@@ -174,6 +179,12 @@ class TestGame:
     def test_reports_no_solo_winner_when_the_game_has_none(self) -> None:
         game: Game = AnyCardGame()
         assert game.solo_winner((Fraction(1), Fraction(1))) is None
+
+    def test_reports_no_round_outcome_when_the_round_does_not_end_the_match(
+        self,
+    ) -> None:
+        game: Game = AnyCardGame()
+        assert game.round_outcomes((Fraction(1), Fraction(1))) is None
 
     def test_names_the_winner_of_a_trick(self) -> None:
         game: Game = AnyCardGame()

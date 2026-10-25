@@ -104,6 +104,18 @@ class MatazzaRules:
                 return SeatIndex(seat)
         return None
 
+    def round_outcomes(
+        self, scores: tuple[Fraction, ...]
+    ) -> tuple[Outcome, ...] | None:
+        """FR-13, FR-19: a solo winner wins and the other three lose, else None."""
+        winner = self.solo_winner(scores)
+        if winner is None:
+            return None
+        return tuple(
+            Outcome.WIN if seat == winner.value else Outcome.LOSS
+            for seat in range(PLAYER_COUNT)
+        )
+
     def round_holder(self, hands: tuple[tuple[Card, ...], ...]) -> SeatIndex | None:
         """FR-14, FR-15: the seat dealt the 8 of spades, or None if nobody holds it."""
         for seat, hand in enumerate(hands):
