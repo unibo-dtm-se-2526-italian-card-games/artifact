@@ -160,9 +160,9 @@ class Match:
         """FR-13, FR-14, FR-18: score the round, then end the match or deal the next."""
         scores = self.round.scores(self._game)
         events: list[DomainEvent] = [RoundScored(scores)]
-        solo_winner = self._game.solo_winner(scores)
-        if solo_winner is not None:
-            events.append(self._end_match(self._solo_win_outcomes(solo_winner)))
+        round_outcomes = self._game.round_outcomes(scores)
+        if round_outcomes is not None:
+            events.append(self._end_match(round_outcomes))
             return events
         if self._holder is None:
             raise ValueError("this game has no holder to award standing points")
@@ -178,13 +178,6 @@ class Match:
             seats = self._game.player_count()
             self._start_round(SeatIndex((self.round.dealer.value + 1) % seats))
         return events
-
-    def _solo_win_outcomes(self, winner: SeatIndex) -> tuple[Outcome, ...]:
-        """FR-19: the solo winner wins and every other seat loses."""
-        return tuple(
-            Outcome.WIN if seat == winner.value else Outcome.LOSS
-            for seat in range(self._game.player_count())
-        )
 
     def _end_match(self, outcomes: tuple[Outcome, ...]) -> GameEnded:
         self._outcomes = outcomes
