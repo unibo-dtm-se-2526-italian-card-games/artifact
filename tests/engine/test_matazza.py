@@ -250,6 +250,15 @@ class TestRoundOutcomes:
         scores = (Fraction(28, 3), Fraction(1), Fraction(1, 3), Fraction(1, 3))
         assert MatazzaRules().round_outcomes(scores) is None
 
+    def test_fr13_a_score_just_under_one_still_allows_the_solo_win(self) -> None:
+        scores = (Fraction(26, 3), Fraction(2, 3), Fraction(2, 3), Fraction(2, 3))
+        expected = (Outcome.WIN, Outcome.LOSS, Outcome.LOSS, Outcome.LOSS)
+        assert MatazzaRules().round_outcomes(scores) == expected
+
+    def test_fr13_two_low_scores_are_not_enough(self) -> None:
+        scores = (Fraction(5), Fraction(4), Fraction(1, 3), Fraction(1, 3))
+        assert MatazzaRules().round_outcomes(scores) is None
+
     def test_fr13_four_scores_are_required(self) -> None:
         with pytest.raises(ValueError):
             MatazzaRules().round_outcomes((Fraction(1), Fraction(1)))
