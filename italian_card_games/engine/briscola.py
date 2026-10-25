@@ -1,5 +1,13 @@
-from italian_card_games.engine.cards import Deck, Rank, Suit
-from italian_card_games.engine.values import Deal, Move, PlayerView, SeatIndex
+from fractions import Fraction
+
+from italian_card_games.engine.cards import Card, Deck, Rank, Suit
+from italian_card_games.engine.values import (
+    Deal,
+    Move,
+    Outcome,
+    PlayerView,
+    SeatIndex,
+)
 
 PLAYER_COUNT = 2
 HAND_SIZE = 3
@@ -10,6 +18,9 @@ _STRENGTH = {
     value: len(_RANKS_BY_STRENGTH) - position
     for position, value in enumerate(_RANKS_BY_STRENGTH)
 }
+
+# FR-20: points of a card by rank. Ranks 2, 4, 5, 6, 7 are worth nothing.
+_POINTS_BY_RANK = {1: 11, 3: 10, 10: 4, 9: 3, 8: 2}
 
 
 def _strength(rank: Rank) -> int:
@@ -53,3 +64,30 @@ class BriscolaRules:
             move for move in trick if move.card.suit == led_suit
         ]
         return max(contenders, key=lambda move: _strength(move.card.rank)).seat
+
+    def round_scores(self, won: tuple[tuple[Card, ...], ...]) -> tuple[Fraction, ...]:
+        """FR-20: each seat's score is the sum of the points of the cards it won."""
+        if len(won) != PLAYER_COUNT:
+            raise ValueError(f"a round has {PLAYER_COUNT} piles, got {len(won)}")
+        all_cards = [card for pile in won for card in pile]
+        if len(set(all_cards)) != len(all_cards):
+            raise ValueError("a card cannot be won twice in a round")
+        return tuple(
+            Fraction(sum(_POINTS_BY_RANK.get(card.rank.value, 0) for card in pile))
+            for pile in won
+        )
+
+    def round_outcomes(self, scores: tuple[Fraction, ...]) -> tuple[Outcome, ...]:
+        """FR-20: the higher score wins the match, equal scores are a draw for both.
+
+        Of the 120 points, 61 or more win, so 60 each is the only tie. One round
+        always decides a Briscola match, so this never returns None.
+        """
+        if len(scores) != PLAYER_COUNT:
+            raise ValueError(f"a round has {PLAYER_COUNT} scores, got {len(scores)}")
+        first, second = scores
+        if first == second:
+            return (Outcome.DRAW, Outcome.DRAW)
+        if first > second:
+            return (Outcome.WIN, Outcome.LOSS)
+        return (Outcome.LOSS, Outcome.WIN)
