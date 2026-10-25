@@ -91,30 +91,24 @@ class MatazzaRules:
             for pile in won
         )
 
-    def solo_winner(self, scores: tuple[Fraction, ...]) -> SeatIndex | None:
-        """FR-13: the seat wins alone if the other three each score below 1.0.
+    def round_outcomes(
+        self, scores: tuple[Fraction, ...]
+    ) -> tuple[Outcome, ...] | None:
+        """FR-13, FR-19: a seat wins alone if the other three each score below 1.0.
 
-        Exactly 1.0 is not below 1.0, so it blocks the solo win.
+        The solo winner wins and the other three lose. Exactly 1.0 is not below
+        1.0, so it blocks the solo win. Without a solo winner the match goes on.
         """
         if len(scores) != PLAYER_COUNT:
             raise ValueError(f"a round has {PLAYER_COUNT} scores, got {len(scores)}")
         for seat in range(PLAYER_COUNT):
             others = scores[:seat] + scores[seat + 1 :]
             if all(other < _LOW_SCORE_LIMIT for other in others):
-                return SeatIndex(seat)
+                return tuple(
+                    Outcome.WIN if other == seat else Outcome.LOSS
+                    for other in range(PLAYER_COUNT)
+                )
         return None
-
-    def round_outcomes(
-        self, scores: tuple[Fraction, ...]
-    ) -> tuple[Outcome, ...] | None:
-        """FR-13, FR-19: a solo winner wins and the other three lose, else None."""
-        winner = self.solo_winner(scores)
-        if winner is None:
-            return None
-        return tuple(
-            Outcome.WIN if seat == winner.value else Outcome.LOSS
-            for seat in range(PLAYER_COUNT)
-        )
 
     def round_holder(self, hands: tuple[tuple[Card, ...], ...]) -> SeatIndex | None:
         """FR-14, FR-15: the seat dealt the 8 of spades, or None if nobody holds it."""

@@ -214,30 +214,6 @@ class TestRoundScores:
             MatazzaRules().round_scores(duplicated)
 
 
-class TestSoloWinner:
-    @pytest.mark.parametrize("seat", [0, 1, 2, 3])
-    def test_fr13_the_player_above_three_low_scores_wins_alone(self, seat: int) -> None:
-        low = Fraction(1, 3)
-        scores = tuple(Fraction(29, 3) if i == seat else low for i in range(4))
-        assert MatazzaRules().solo_winner(scores) == SeatIndex(seat)
-
-    def test_fr13_a_score_of_exactly_one_blocks_the_solo_win(self) -> None:
-        scores = (Fraction(28, 3), Fraction(1), Fraction(1, 3), Fraction(1, 3))
-        assert MatazzaRules().solo_winner(scores) is None
-
-    def test_fr13_a_score_just_under_one_still_allows_the_solo_win(self) -> None:
-        scores = (Fraction(26, 3), Fraction(2, 3), Fraction(2, 3), Fraction(2, 3))
-        assert MatazzaRules().solo_winner(scores) == SeatIndex(0)
-
-    def test_fr13_two_low_scores_are_not_enough(self) -> None:
-        scores = (Fraction(5), Fraction(4), Fraction(1, 3), Fraction(1, 3))
-        assert MatazzaRules().solo_winner(scores) is None
-
-    def test_fr13_four_scores_are_required(self) -> None:
-        with pytest.raises(ValueError):
-            MatazzaRules().solo_winner((Fraction(1), Fraction(1)))
-
-
 class TestRoundOutcomes:
     @pytest.mark.parametrize("seat", [0, 1, 2, 3])
     def test_fr13_a_solo_winner_wins_and_the_other_three_lose(self, seat: int) -> None:
