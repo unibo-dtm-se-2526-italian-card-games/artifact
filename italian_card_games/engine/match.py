@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from fractions import Fraction
 from random import Random
 
-from italian_card_games.engine.cards import DECK_SIZE, Card, Deck, DeckFactory
+from italian_card_games.engine.cards import DECK_SIZE, Card, Deck, DeckFactory, Suit
 from italian_card_games.engine.events import (
     CardPlayed,
     DomainEvent,
@@ -12,7 +12,13 @@ from italian_card_games.engine.events import (
     TrickWon,
 )
 from italian_card_games.engine.ports import Game
-from italian_card_games.engine.values import Move, Outcome, PlayerView, SeatIndex
+from italian_card_games.engine.values import (
+    Deal,
+    Move,
+    Outcome,
+    PlayerView,
+    SeatIndex,
+)
 
 
 class IllegalMoveError(ValueError):
@@ -21,13 +27,15 @@ class IllegalMoveError(ValueError):
 
 @dataclass(slots=True)
 class Round:
-    """The state of one round: who holds what, the trick in play, and the cards won."""
+    """The state of one round: hands, trick in play, cards won, stock and trump suit."""
 
     hands: tuple[tuple[Card, ...], ...]
     dealer: SeatIndex
     leader: SeatIndex
     trick: tuple[Move, ...]
     won: tuple[tuple[Card, ...], ...]
+    stock: tuple[Card, ...] = ()
+    trump: Suit | None = None
 
     @classmethod
     def deal(cls, deck: Deck, dealer: SeatIndex, player_count: int) -> "Round":
@@ -37,8 +45,15 @@ class Round:
         if dealer.value >= player_count:
             raise ValueError(f"dealer seat {dealer.value} is out of range")
         hands = tuple(deck.cards[seat::player_count] for seat in range(player_count))
+        return cls.start(Deal(hands, (), None), dealer)
+
+    @classmethod
+    def start(cls, deal: Deal, dealer: SeatIndex) -> "Round":
+        """FR-11: begin a round from a deal, the seat after the dealer leads."""
+        player_count = len(deal.hands)
         leader = SeatIndex((dealer.value + 1) % player_count)
-        return cls(hands, dealer, leader, (), ((),) * player_count)
+        won = ((),) * player_count
+        return cls(deal.hands, dealer, leader, (), won, deal.stock, deal.trump)
 
     @property
     def current_seat(self) -> SeatIndex:
@@ -56,7 +71,7 @@ class Round:
         """FR-06: what one seat may see, its own hand and the trick in play."""
         if seat.value >= len(self.hands):
             raise ValueError(f"seat {seat.value} is out of range")
-        return PlayerView(seat, self.hands[seat.value], self.trick)
+        return PlayerView(seat, self.hands[seat.value], self.trick, self.trump)
 
     def scores(self, game: Game) -> tuple[Fraction, ...]:
         """FR-12: each seat's score from the cards it won, once the round is over."""
@@ -81,10 +96,16 @@ class Round:
         if len(trick) < len(hands):
             self.hands, self.trick = tuple(hands), trick
             return
-        winner = game.trick_winner(trick)
+        winner = game.trick_winner(trick, self.trump)
         won = list(self.won)
         won[winner.value] += tuple(m.card for m in trick)
-        self.hands, self.won = tuple(hands), tuple(won)
+        stock = self.stock
+        for offset in range(len(hands)):
+            if stock:
+                drawer = (winner.value + offset) % len(hands)
+                hands[drawer] += (stock[0],)
+                stock = stock[1:]
+        self.hands, self.won, self.stock = tuple(hands), tuple(won), stock
         self.leader, self.trick = winner, ()
 
 
@@ -141,16 +162,16 @@ class Match:
     def _start_round(self, dealer: SeatIndex) -> None:
         """FR-02, FR-11, NFR-04: deal a fresh shuffle from the injected random source."""
         deck = DeckFactory.shuffled(self._rng)
-        self.round = Round.deal(deck, dealer, self._game.player_count())
+        self.round = Round.start(self._game.deal(deck), dealer)
         self._holder = self._game.round_holder(self.round.hands)
 
     def _end_round(self) -> list[DomainEvent]:
         """FR-13, FR-14, FR-18: score the round, then end the match or deal the next."""
         scores = self.round.scores(self._game)
         events: list[DomainEvent] = [RoundScored(scores)]
-        solo_winner = self._game.solo_winner(scores)
-        if solo_winner is not None:
-            events.append(self._end_match(self._solo_win_outcomes(solo_winner)))
+        round_outcomes = self._game.round_outcomes(scores)
+        if round_outcomes is not None:
+            events.append(self._end_match(round_outcomes))
             return events
         if self._holder is None:
             raise ValueError("this game has no holder to award standing points")
@@ -166,13 +187,6 @@ class Match:
             seats = self._game.player_count()
             self._start_round(SeatIndex((self.round.dealer.value + 1) % seats))
         return events
-
-    def _solo_win_outcomes(self, winner: SeatIndex) -> tuple[Outcome, ...]:
-        """FR-19: the solo winner wins and every other seat loses."""
-        return tuple(
-            Outcome.WIN if seat == winner.value else Outcome.LOSS
-            for seat in range(self._game.player_count())
-        )
 
     def _end_match(self, outcomes: tuple[Outcome, ...]) -> GameEnded:
         self._outcomes = outcomes

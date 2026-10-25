@@ -1,8 +1,14 @@
 from fractions import Fraction
 from typing import Protocol, runtime_checkable
 
-from italian_card_games.engine.cards import Card
-from italian_card_games.engine.values import Move, Outcome, PlayerView, SeatIndex
+from italian_card_games.engine.cards import Card, Deck, Suit
+from italian_card_games.engine.values import (
+    Deal,
+    Move,
+    Outcome,
+    PlayerView,
+    SeatIndex,
+)
 
 
 @runtime_checkable
@@ -13,20 +19,31 @@ class Game(Protocol):
         """How many seats a match of this game needs."""
         ...
 
+    def deal(self, deck: Deck) -> Deal:
+        """Split a shuffled deck into the hands, the stock and the trump suit."""
+        ...
+
     def legal_moves(self, view: PlayerView) -> tuple[Move, ...]:
         """The moves the viewing seat is allowed to make right now."""
         ...
 
-    def trick_winner(self, trick: tuple[Move, ...]) -> SeatIndex:
-        """The seat that wins a complete trick, given its moves in play order."""
+    def trick_winner(
+        self, trick: tuple[Move, ...], trump: Suit | None = None
+    ) -> SeatIndex:
+        """The seat that wins a complete trick, given its moves in play order.
+
+        `trump` is the trump suit of the round, None for games without one.
+        """
         ...
 
     def round_scores(self, won: tuple[tuple[Card, ...], ...]) -> tuple[Fraction, ...]:
         """Each seat's score for a round, from the cards that seat won, by seat order."""
         ...
 
-    def solo_winner(self, scores: tuple[Fraction, ...]) -> SeatIndex | None:
-        """The seat that wins the whole game from these round scores, or None."""
+    def round_outcomes(
+        self, scores: tuple[Fraction, ...]
+    ) -> tuple[Outcome, ...] | None:
+        """Each seat's outcome if this round alone ends the match, else None."""
         ...
 
     def standing_points(

@@ -1,7 +1,13 @@
 from fractions import Fraction
 
-from italian_card_games.engine.cards import Card, Rank, Suit
-from italian_card_games.engine.values import Move, Outcome, PlayerView, SeatIndex
+from italian_card_games.engine.cards import Card, Deck, Rank, Suit
+from italian_card_games.engine.values import (
+    Deal,
+    Move,
+    Outcome,
+    PlayerView,
+    SeatIndex,
+)
 
 PLAYER_COUNT = 4
 
@@ -40,6 +46,11 @@ class MatazzaRules:
     def player_count(self) -> int:
         return PLAYER_COUNT
 
+    def deal(self, deck: Deck) -> Deal:
+        """FR-07: deal the whole deck evenly, so there is no stock and no trump."""
+        hands = tuple(deck.cards[seat::PLAYER_COUNT] for seat in range(PLAYER_COUNT))
+        return Deal(hands, (), None)
+
     def legal_moves(self, view: PlayerView) -> tuple[Move, ...]:
         """FR-09: follow the led suit if you hold it, otherwise play any card.
 
@@ -53,8 +64,13 @@ class MatazzaRules:
                 hand = same_suit
         return tuple(Move(view.seat, card) for card in hand)
 
-    def trick_winner(self, trick: tuple[Move, ...]) -> SeatIndex:
-        """FR-10: the highest-strength card of the led suit wins the trick."""
+    def trick_winner(
+        self, trick: tuple[Move, ...], trump: Suit | None = None
+    ) -> SeatIndex:
+        """FR-10: the highest-strength card of the led suit wins the trick.
+
+        Matazza has no trump suit, so `trump` is accepted and ignored.
+        """
         if len(trick) != PLAYER_COUNT:
             raise ValueError(f"a trick has {PLAYER_COUNT} moves, got {len(trick)}")
         if len({move.seat for move in trick}) != PLAYER_COUNT:
@@ -75,17 +91,23 @@ class MatazzaRules:
             for pile in won
         )
 
-    def solo_winner(self, scores: tuple[Fraction, ...]) -> SeatIndex | None:
-        """FR-13: the seat wins alone if the other three each score below 1.0.
+    def round_outcomes(
+        self, scores: tuple[Fraction, ...]
+    ) -> tuple[Outcome, ...] | None:
+        """FR-13, FR-19: a seat wins alone if the other three each score below 1.0.
 
-        Exactly 1.0 is not below 1.0, so it blocks the solo win.
+        The solo winner wins and the other three lose. Exactly 1.0 is not below
+        1.0, so it blocks the solo win. Without a solo winner the match goes on.
         """
         if len(scores) != PLAYER_COUNT:
             raise ValueError(f"a round has {PLAYER_COUNT} scores, got {len(scores)}")
         for seat in range(PLAYER_COUNT):
             others = scores[:seat] + scores[seat + 1 :]
             if all(other < _LOW_SCORE_LIMIT for other in others):
-                return SeatIndex(seat)
+                return tuple(
+                    Outcome.WIN if other == seat else Outcome.LOSS
+                    for other in range(PLAYER_COUNT)
+                )
         return None
 
     def round_holder(self, hands: tuple[tuple[Card, ...], ...]) -> SeatIndex | None:

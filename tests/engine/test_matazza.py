@@ -8,7 +8,7 @@ import pytest
 from italian_card_games.engine.cards import Card, DeckFactory, Rank, Suit
 from italian_card_games.engine.matazza import MatazzaRules
 from italian_card_games.engine.ports import Game
-from italian_card_games.engine.values import Move, PlayerView, SeatIndex
+from italian_card_games.engine.values import Move, Outcome, PlayerView, SeatIndex
 
 # FR-08: strongest first.
 STRENGTH_ORDER = [3, 2, 1, 10, 9, 8, 7, 6, 5, 4]
@@ -94,6 +94,15 @@ class TestTrickWinnerFollowSuit:
             move(1, Suit.BASTONI, 9),
         )
         assert MatazzaRules().trick_winner(trick) == SeatIndex(3)
+
+    def test_fr10_a_trump_suit_given_to_matazza_is_ignored(self) -> None:
+        trick = (
+            move(0, Suit.COPPE, 4),
+            move(1, Suit.SPADE, 3),  # would win if SPADE were a trump
+            move(2, Suit.DENARI, 2),
+            move(3, Suit.COPPE, 5),
+        )
+        assert MatazzaRules().trick_winner(trick, Suit.SPADE) == SeatIndex(3)
 
     @pytest.mark.parametrize("played", [0, 1, 2, 3, 5])
     def test_rejects_a_trick_without_four_moves(self, played: int) -> None:
@@ -205,25 +214,27 @@ class TestRoundScores:
             MatazzaRules().round_scores(duplicated)
 
 
-class TestSoloWinner:
+class TestRoundOutcomes:
     @pytest.mark.parametrize("seat", [0, 1, 2, 3])
-    def test_fr13_the_player_above_three_low_scores_wins_alone(self, seat: int) -> None:
+    def test_fr13_a_solo_winner_wins_and_the_other_three_lose(self, seat: int) -> None:
         low = Fraction(1, 3)
         scores = tuple(Fraction(29, 3) if i == seat else low for i in range(4))
-        assert MatazzaRules().solo_winner(scores) == SeatIndex(seat)
+        expected = tuple(Outcome.WIN if i == seat else Outcome.LOSS for i in range(4))
+        assert MatazzaRules().round_outcomes(scores) == expected
 
-    def test_fr13_a_score_of_exactly_one_blocks_the_solo_win(self) -> None:
+    def test_fr13_a_round_without_a_solo_winner_leaves_the_match_going(self) -> None:
         scores = (Fraction(28, 3), Fraction(1), Fraction(1, 3), Fraction(1, 3))
-        assert MatazzaRules().solo_winner(scores) is None
+        assert MatazzaRules().round_outcomes(scores) is None
 
     def test_fr13_a_score_just_under_one_still_allows_the_solo_win(self) -> None:
         scores = (Fraction(26, 3), Fraction(2, 3), Fraction(2, 3), Fraction(2, 3))
-        assert MatazzaRules().solo_winner(scores) == SeatIndex(0)
+        expected = (Outcome.WIN, Outcome.LOSS, Outcome.LOSS, Outcome.LOSS)
+        assert MatazzaRules().round_outcomes(scores) == expected
 
     def test_fr13_two_low_scores_are_not_enough(self) -> None:
         scores = (Fraction(5), Fraction(4), Fraction(1, 3), Fraction(1, 3))
-        assert MatazzaRules().solo_winner(scores) is None
+        assert MatazzaRules().round_outcomes(scores) is None
 
     def test_fr13_four_scores_are_required(self) -> None:
         with pytest.raises(ValueError):
-            MatazzaRules().solo_winner((Fraction(1), Fraction(1)))
+            MatazzaRules().round_outcomes((Fraction(1), Fraction(1)))

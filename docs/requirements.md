@@ -20,7 +20,7 @@ IDs are stable. Tests and pull requests reference them (e.g. `FR-13`). A require
 |---|---|---|
 | FR-01 | The engine supports several games through one common `Game` interface. Adding a game does not change the engine core. | A second game (Briscola) is implemented against the same interface with no change to shared code other than extracted abstractions. |
 | FR-02 | The engine provides the 40-card Italian deck (suits denari, coppe, spade, bastoni; ranks 1-10) with shuffling driven by an injectable random source. | Tests show 40 distinct cards, and the same seed gives the same order. |
-| FR-03 | Each game declares its own player count and team structure. The engine does not assume 4 free-for-all players. | Matazza declares 4 free-for-all; the interface allows other counts and teams. |
+| FR-03 | Each game declares its own player count and team structure. The engine does not assume 4 free-for-all players. | Matazza declares 4 free-for-all and Briscola declares 2 free-for-all; the interface allows other counts and teams. |
 | FR-04 | A player (human or bot) is anything that returns a move given a game state. The engine has no special cases for either. | The same match runs with all-human, all-bot and mixed players through one code path. |
 | FR-05 | A move is validated against the rules. An illegal move is rejected with an explicit error and the game state is unchanged. | A test per rule shows the illegal move is rejected and the state is identical before and after. |
 | FR-06 | The view of the state given to a player contains only what that player may see (their own hand and public information). | A test shows another player's hand is absent from a player's view. |
@@ -41,13 +41,13 @@ IDs are stable. Tests and pull requests reference them (e.g. `FR-13`). A require
 | FR-16 | Standing points when `numLow == 2`: those two players take one point each, regardless of who holds the 8 of spades. | Worked example C passes as a test. |
 | FR-17 | The case `numLow == 3` is unreachable because the solo-win check always fires first. If reached, the engine raises an error. | A test forces the state and expects the error. |
 | FR-18 | The game ends when one player has 12 standing points (that player loses alone), or when two players have each reached 6 standing points (both lose). The check runs every time points are awarded. | Tests cover both conditions, including the two players reaching 6 in different rounds. |
-| FR-19 | At the end of a game each player is recorded as having won or lost. Final standing points do not decide the outcome. A solo-win player wins and the other three lose. When the game ends by the 12-point or the two-at-6 rule, the losing players lose and all others win. | A test per end condition checks the outcome for all four players. |
+| FR-19 | At the end of a game each player is recorded as having won, lost or drawn. Final standing points do not decide the outcome. A solo-win player wins and the other three lose. When the game ends by the 12-point or the two-at-6 rule, the losing players lose and all others win. Only a Briscola match tied at 60 points each is a draw for both players (FR-20). | A test per end condition checks the outcome for all four players. |
 
 ### 2.3 Briscola
 
 | ID | Requirement | Done when |
 |---|---|---|
-| FR-20 | At least one more game, Briscola, is playable through the same `Game` interface. Its player count and team rules are specified when it is implemented. | Briscola can be played from start to finish offline against bots. |
+| FR-20 | Briscola is playable through the same `Game` interface. A match has 2 players, free-for-all, and is a single round. 3 cards are dealt to each player in turn and the other 34 form the stock; the suit of the last card of the stock is the trump. Any card in hand may be played, with no duty to follow suit. The trick goes to the highest trump, otherwise to the highest card of the led suit, with strength `1 > 3 > 10 > 9 > 8 > 7 > 6 > 5 > 4 > 2`. After each trick the winner draws first and the other player second, so the last player to draw takes the trump card. Card points are 11 for the 1, 10 for the 3, 4 for the 10, 3 for the 9, 2 for the 8 and 0 for the rest, 120 in all. The round ends when all hands and the stock are empty. The player with the higher score wins and the other loses; 60 points each is a draw for both. | Briscola can be played from start to finish offline against a bot. Tests cover the strength order, trump, drawing order, card points summing to 120, the win and the 60-60 draw. |
 
 ### 2.4 AI
 
@@ -73,9 +73,9 @@ IDs are stable. Tests and pull requests reference them (e.g. `FR-13`). A require
 
 | ID | Requirement | Done when |
 |---|---|---|
-| FR-31 | Finished matches are persisted: game type, participants (human or bot), each player's score in every round, and the win or loss of each player. The total standing points of a game are not stored. | A match survives a restart and can be read back, with its round scores and outcomes. |
+| FR-31 | Finished matches are persisted: game type, participants (human or bot), each player's score in every round, and the win, loss or draw of each player. The total standing points of a game are not stored. | A match survives a restart and can be read back, with its round scores and outcomes. |
 | FR-32 | A player can retrieve their match history, including the round-by-round scores of each match. | History for a nickname lists their matches in order, each with its round scores. |
-| FR-33 | A player can retrieve statistics: matches played, wins and losses, per game type. | Stats match the stored history in a test. |
+| FR-33 | A player can retrieve statistics: matches played, wins, losses and draws, per game type. | Stats match the stored history in a test. |
 
 ### 2.7 API and clients
 
@@ -117,4 +117,5 @@ IDs are stable. Tests and pull requests reference them (e.g. `FR-13`). A require
 
 ## 5. Open questions
 
-- **Briscola (FR-20):** player count, team rules and scoring are to be defined at step 11.
+- **Briscola variants (FR-20):** Briscola is specified for 2 players. A 4-player version with teams is out of scope for now and would need team support in the `Game` interface.
+- **Bots per game (FR-23, FR-36):** these say "three bots", which is right for Matazza. For Briscola the human plays against one bot.
