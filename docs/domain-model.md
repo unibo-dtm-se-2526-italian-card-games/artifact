@@ -16,19 +16,22 @@ Words are used with exactly one meaning in code, tests and documents. Italian te
 | Rank | `Rank` | A number from 1 to 10. Rank 1 is the *asso* (ace). |
 | Card | `Card` | A suit and a rank. |
 | Deck (mazzo) | `Deck` | The 40 distinct cards. |
-| Hand | `Hand` | The cards a seat holds and has not played yet. |
+| Hand | | The cards a seat holds and has not played yet. A tuple of cards inside `Round`. |
 | Move | `Move` | A seat playing one card. |
-| Trick (presa) | `Trick` | The cards played one per seat, from a leader, until a winner takes them. |
+| Trick (presa) | | The cards played one per seat, from a leader, until a winner takes them. The moves in play are a tuple inside `Round`. |
 | Leader | | The seat that plays the first card of a trick. |
 | Led suit | | The suit of the first card of a trick. |
-| Round | `Round` | One deal of the whole deck, played out in tricks until all hands are empty. |
+| Deal | `Deal` | How a game splits a shuffled deck: a hand per seat, the stock and the trump suit (FR-07, FR-20). |
+| Stock (mazzo) | | The cards left after the deal, drawn from the front after each trick. Empty in Matazza. |
+| Trump (briscola) | | In Briscola, the suit of the last card of the stock, which is turned up. A trump beats any card of another suit. `None` in Matazza. |
+| Round | `Round` | One deal of the deck, played out in tricks until all hands and the stock are empty. |
 | Dealer | | The seat that deals a round. It rotates each round (FR-11). |
 | Round score | | Points a seat gets from the cards it captured in one round. A `Fraction`, never a float (FR-12). |
-| Standing points | `StandingPoints` | Penalty points accumulated across the rounds of a match. Reaching the limits ends the match. |
+| Standing points | | Penalty points accumulated across the rounds of a Matazza match, as an integer per seat. Reaching the limits ends the match. Briscola has none. |
 | Cursed card | | In Matazza, the 8 of spades. Its holder is relevant when standing points are awarded. |
 | Solo win | | In Matazza, a round in which three seats each score less than 1.0 (exactly 1.0 does not count). That seat wins the match. |
-| Outcome | `Outcome` | `WIN` or `LOSS` for a seat at the end of a match (FR-19). |
-| Player view | `PlayerView` | What one seat may see of the match: its own hand and public information (FR-06). |
+| Outcome | `Outcome` | `WIN`, `LOSS` or `DRAW` for a seat at the end of a match (FR-19). Only a Briscola match tied at 60 points each is a `DRAW`. |
+| Player view | `PlayerView` | What one seat may see of the match: its own hand, the cards on the table and the trump suit (FR-06). |
 | Domain event | `DomainEvent` | A fact that happened in a match (e.g. `TrickWon`). Other parts of the system react to it. |
 | Lobby | `Lobby` | A waiting room where seats are filled before a match starts. |
 | Join code | `JoinCode` | The code used to enter a lobby. |
@@ -74,29 +77,29 @@ Relations between contexts:
 |---|---|---|
 | Value object | `Suit`, `Rank`, `Card` | Immutable. Equal when their values are equal. |
 | Value object | `Deck` | Exactly 40 distinct cards (FR-02). |
-| Value object | `Hand` | The unplayed cards of a seat. |
 | Value object | `SeatIndex` | A number from 0 to player count minus 1. |
 | Value object | `Move` | A seat and a card. |
-| Value object | `StandingPoints` | A non-negative integer per seat. |
-| Value object | `Outcome` | `WIN` or `LOSS`. |
-| Value object | `PlayerView` | Own hand plus public information. Built by the match (FR-06). |
-| Entity | `Round` | Holds the hands, the dealer, the leader, the trick in play and the cards each seat has won. It validates each move against the `Game` and resolves a trick when it is complete. |
-| Entity | `Trick` | Identity: its position within the round. Holds the moves made. |
+| Value object | `Deal` | The hands, the stock and the trump suit that a game makes from a shuffled deck. |
+| Value object | `Outcome` | `WIN`, `LOSS` or `DRAW`. |
+| Value object | `PlayerView` | Own hand, the moves on the table and the trump suit. Built by the match (FR-06). |
+| Entity | `Round` | Holds the hands, the dealer, the leader, the trick in play, the cards each seat has won, the stock and the trump suit. It validates each move against the `Game`, resolves a trick when it is complete and then lets the winner draw first from the stock. The hands, the trick and the standing points are plain tuples, not entities of their own. |
 | **Aggregate root** | `Match` | The only object outside code talks to. Built from a `Game` and an injected `Random`, it deals each round, plays moves through `Round`, scores the round, awards the standing points, rotates the dealer and ends the match. It enforces every rule and invariant of its rounds and tricks. It has no `MatchId` yet: the id is added at step 13, when a finished match is persisted. |
 | Factory | `DeckFactory` | Builds a shuffled `Deck` from an injectable random source (FR-02, NFR-04). |
-| Factory | `MatchFactory` | Builds a `Match` for a game type and a number of seats. |
-| Port (interface) | `Game` | The rules of one game: player count, legal moves, trick winner, round scores, solo winner, standing points, round holder, end conditions (FR-01, FR-03). Dealing is done by `Round.deal`. Implemented by `MatazzaRules` and `BriscolaRules`. |
+| Factory | `MatchFactory` | *Planned, not in code yet.* Builds a `Match` for a game type and a number of seats. The Lobby needs it, so it comes with the Lobby. |
+| Port (interface) | `Game` | The rules of one game: player count, deal, legal moves, trick winner, round scores, round outcomes, standing points, round holder, end conditions (FR-01, FR-03). Implemented by `MatazzaRules` and `BriscolaRules`. |
 | Port (interface) | `AIStrategy` | `choose_move(view) -> Move`. Implemented by the rule-based, LLM and (stretch) Prolog strategies (FR-21). |
-| Domain event | `CardPlayed`, `TrickWon`, `RoundScored`, `StandingPointsAwarded`, `GameEnded` | Frozen dataclasses with a common `DomainEvent` base, returned as a list by `Match.play`. A solo win ends the match with `GameEnded` and no `StandingPointsAwarded`. Used for real-time updates (FR-29) and for History (FR-31). |
+| Domain event | `CardPlayed`, `TrickWon`, `RoundScored`, `StandingPointsAwarded`, `GameEnded` | Frozen dataclasses with a common `DomainEvent` base, returned as a list by `Match.play`. A round that decides the match by itself (a Matazza solo win, or any Briscola round) ends it with `GameEnded` and no `StandingPointsAwarded`. Used for real-time updates (FR-29) and for History (FR-31). |
 
 Design choices:
 
 - **Mutable aggregate, events as output.** `Match` and `Round` change in place, like the aggregates they are, and `Match.play` returns the list of events that the move caused. An illegal move raises `IllegalMoveError` and leaves the state unchanged. Replay is deterministic (NFR-04) because the only source of randomness is the `Random` injected into `Match`, and the same events feed WebSockets and History. A bot that wants to try a move uses `Game.legal_moves` on its `PlayerView`, so it never needs a copy of the match.
 - **Per-game rules behind `Game`.** `Match` delegates every game-specific decision to its `Game`. Adding Briscola does not change `Match` (FR-01).
 - **Ports are `typing.Protocol`s.** `Game` and `AIStrategy` are matched by shape, so adapters (LLM, Prolog) do not inherit from an engine class. Mypy checks the signatures (NFR-01).
-- **Legal moves come from the player view.** `Game.legal_moves(view)` uses the same `PlayerView` a bot receives: the seat, its hand and the cards on the table. That is enough for follow-suit rules, and it guarantees a bot and the legality check see the same information (FR-04, FR-06).
-- **`Game` grows with the rules.** It has `player_count`, `legal_moves`, `trick_winner`, `round_scores`, `solo_winner`, `standing_points`, `round_holder` and `outcomes`. `standing_points(scores, holder)` returns the points each seat earns in a round, and `round_holder(hands)` returns the seat dealt the key card (the 8 of spades in Matazza), or `None` for a game without one. `trick_winner` takes the four moves of a complete trick and raises an error otherwise. `round_scores` takes the cards each seat won, in seat order, and returns exact `Fraction` scores; it raises an error for a wrong pile count or a duplicate card. `solo_winner` takes the four round scores and returns the seat that wins alone (the other three score below 1.0), or `None` (FR-12, FR-13). Whose turn it is belongs to `Match`, not to `Game.legal_moves`.
-- **Matazza rules live on `MatazzaRules`, with no separate domain services.** The trick winner, round scores, solo win and standing points are plain methods of `MatazzaRules`, so there is no `TrickResolver` or `StandingsCalculator`. `standing_points(scores, holder)` is on the `Game` port, because `Match` calls it after the solo-win check. It takes the four round scores and the seat dealt the 8 of spades (the holder, which cannot be recovered from the scores). It returns the points each seat earns, always two in total, and raises an error for three low scores, a wrong score count or a holder outside the table (FR-14 to FR-17).
+- **Legal moves come from the player view.** `Game.legal_moves(view)` uses the same `PlayerView` a bot receives: the seat, its hand, the cards on the table and the trump suit. That is enough for follow-suit rules, and it guarantees a bot and the legality check see the same information (FR-04, FR-06).
+- **`Game` grows with the rules.** It has `player_count`, `deal`, `legal_moves`, `trick_winner`, `round_scores`, `round_outcomes`, `standing_points`, `round_holder` and `outcomes`. `deal(deck)` returns a `Deal`. `trick_winner(trick, trump)` takes the moves of a complete trick and the trump suit, `None` for a game without one, and raises an error for a trick of the wrong size. `round_scores` takes the cards each seat won, in seat order, and returns exact `Fraction` scores; it raises an error for a wrong pile count or a duplicate card. `round_outcomes(scores)` returns the outcome of every seat if this round alone ends the match, or `None` if the match goes on (FR-12, FR-13, FR-20). `standing_points(scores, holder)` returns the points each seat earns in a round, and `round_holder(hands)` returns the seat dealt the key card (the 8 of spades in Matazza), or `None`. Whose turn it is belongs to `Match`, not to `Game.legal_moves`.
+- **Matazza rules live on `MatazzaRules`, with no separate domain services.** The trick winner, round scores, solo win and standing points are plain methods of `MatazzaRules`, so there is no `TrickResolver` or `StandingsCalculator`. `round_outcomes` holds the solo win (the other three score below 1.0), which replaced a separate `solo_winner` method. `standing_points(scores, holder)` is on the `Game` port, because `Match` calls it after `round_outcomes` returns `None`. It takes the four round scores and the seat dealt the 8 of spades (the holder, which cannot be recovered from the scores). It returns the points each seat earns, always two in total, and raises an error for three low scores, a wrong score count or a holder outside the table (FR-14 to FR-17).
+- **Briscola is one round and two players.** `BriscolaRules` has 2 seats and no teams, so `Game` needed no team support (FR-03). `deal` gives 3 cards to each seat in turn and keeps the other 34 as the stock; the suit of the last card of the stock is the trump. The rules are stateless: the trump travels in the `Deal`, the `Round`, the `PlayerView` and the `trick_winner` argument, so one `BriscolaRules` serves any number of rounds. Any card in hand is legal, with no duty to follow suit. A trick goes to the highest trump, else to the highest card of the led suit, with strength Ace, 3, 10, 9, 8, 7, 6, 5, 4, 2. After each trick the winner draws first, then the other seat, so the turned-up trump card goes to the last drawer. Card points are Ace 11, 3 is 10, 10 is 4, 9 is 3, 8 is 2, the rest 0, 120 in all. `round_outcomes` gives the win to the higher score, and 60 each is a `DRAW` for both seats. It never returns `None`, so `Match` ends the match after the round with `GameEnded` and no standing points.
+- **Briscola implements the standing methods as neutral stubs.** `round_holder` returns `None`, `standing_points` returns zeros and `outcomes` returns `None`, because `Match` never reaches them for a game whose `round_outcomes` is always decided. This is a known trade-off of one `Game` port for both games (see section 6).
 
 ### 3.2 Lobby
 
@@ -143,19 +146,19 @@ classDiagram
         <<entity>>
         +SeatIndex dealer
         +SeatIndex leader
-        +deal(deck, dealer, player_count) Round
+        +tuple~Card~ stock
+        +Suit trump
+        +start(deal, dealer) Round
         +play(move, game)
         +view_for(seat) PlayerView
         +scores(game) tuple~Fraction~
         +is_over() bool
     }
-    class Trick {
-        <<entity>>
-        +SeatIndex leader
-        +led_suit() Suit
-    }
-    class Hand {
+    class Deal {
         <<value object>>
+        +tuple hands
+        +tuple~Card~ stock
+        +Suit trump
     }
     class Move {
         <<value object>>
@@ -181,14 +184,19 @@ classDiagram
     }
     class PlayerView {
         <<value object>>
+        +SeatIndex seat
+        +tuple~Card~ hand
+        +tuple~Move~ trick
+        +Suit trump
     }
     class Game {
         <<interface>>
         +player_count() int
+        +deal(deck) Deal
         +legal_moves(view) list~Move~
-        +trick_winner(trick) SeatIndex
+        +trick_winner(trick, trump) SeatIndex
         +round_scores(won) tuple~Fraction~
-        +solo_winner(scores) SeatIndex
+        +round_outcomes(scores) tuple~Outcome~
         +standing_points(scores, holder) tuple~int~
         +round_holder(hands) SeatIndex
         +outcomes(standing_totals) tuple~Outcome~
@@ -210,10 +218,9 @@ classDiagram
     }
 
     Match "1" *-- "1..*" Round
-    Round "1" *-- "0..10" Trick
-    Round "1" *-- "n" Hand
-    Trick "1" *-- "0..n" Move
-    Hand "1" o-- "0..10" Card
+    Round "1" o-- "0..n" Move : trick in play
+    Round ..> Deal : starts from
+    Deal "1" o-- "n" Card
     Move --> Card
     Card --> Suit
     Card --> Rank
@@ -222,6 +229,7 @@ classDiagram
     Game <|.. MatazzaRules
     Game <|.. BriscolaRules
     Game ..> PlayerView
+    Game ..> Deal : deals
     Match ..> PlayerView : builds
     Match ..> DomainEvent : emits
     AIStrategy ..> PlayerView
@@ -314,12 +322,16 @@ classDiagram
 | An illegal move is rejected and the state is unchanged. | `Round.play` using `Game.legal_moves`, called by `Match.play` | FR-05, FR-09 |
 | No move is accepted once the match is over. | `Match.play` | FR-18, FR-19 |
 | The trick winner holds the highest-strength card of the led suit. | `MatazzaRules.trick_winner` | FR-08, FR-10 |
+| The trick winner holds the highest trump, else the highest card of the led suit. A trick without a trump suit is rejected. | `BriscolaRules.trick_winner` | FR-20 |
+| After a trick the winner draws first, then the other seat, until the stock is empty. The last card of the stock goes to the last drawer. | `Round.play` | FR-20 |
+| The two Briscola scores sum to 120 for a whole round. | `BriscolaRules.round_scores`, which counts the points of each card | FR-20 |
+| A Briscola match is decided by its single round: the higher score wins and 60 each is a draw. | `BriscolaRules.round_outcomes`, called by `Match` | FR-19, FR-20 |
 | The first leader is the seat after the dealer, and the dealer rotates each round. | `Match` when it starts a round | FR-11 |
 | The four round scores sum to exactly 32/3. | `Game.round_scores`, which returns exact `Fraction`s | FR-12 |
-| A solo win is checked before any standing points. | `Game.solo_winner`, called by `Match` first | FR-13 |
+| A round that decides the match by itself, such as a Matazza solo win, is checked before any standing points. | `Game.round_outcomes`, called by `Match` first | FR-13 |
 | `numLow == 3` is unreachable and raises an error. | `MatazzaRules.standing_points` | FR-17 |
 | The end conditions are checked every time points are awarded. | `Match`, through `Game.outcomes` | FR-18 |
-| Every seat ends with exactly one outcome, win or loss. | `Match` when it emits `GameEnded` | FR-19 |
+| Every seat ends with exactly one outcome, win, loss or draw. | `Match` when it emits `GameEnded` | FR-19 |
 | A player view never contains another seat's hand. | `Match.view_for` | FR-06 |
 | A record keeps round scores and outcomes but not total standing points. | `MatchRecorder`, `MatchRecord` | FR-31 |
 | A nickname is registered at most once. | `NicknameRegistry`, backed by a unique constraint in the database | FR-26 |
@@ -328,5 +340,6 @@ classDiagram
 
 ## 6. Open questions
 
-- **Briscola.** Whether `Game` needs team support is decided at step 11. `Game.player_count` and `Game.outcomes` are meant to leave room for it.
-- **Games without a holder.** `Game.round_holder` may return `None`, but `Game.standing_points` needs a seat, so `Match` raises an error if a game with no holder reaches the standing points. Step 11 decides how a second game awards points.
+- **Standing methods on the shared port.** Briscola never uses `round_holder`, `standing_points` or `outcomes`, so it implements them as neutral stubs. A cleaner design would split the standings methods into a separate optional port that only multi-round games implement. This is left for later, and `Match` still raises an error if a game with no holder reaches the standing points.
+- **Teams.** Briscola was specified for 2 players, so `Game` has no team support. A 4-player Briscola with teams would need it in `Game`, `Outcome` and `Match`.
+- **A draw in the history.** `Outcome.DRAW` exists only for a Briscola tie. `MatchRecord` and the statistics (step 13) currently count wins and losses, so they need a rule for a draw.
