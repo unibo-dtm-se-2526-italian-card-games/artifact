@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from fractions import Fraction
 from random import Random
 
-from italian_card_games.engine.cards import DECK_SIZE, Card, Deck, DeckFactory
+from italian_card_games.engine.cards import DECK_SIZE, Card, Deck, DeckFactory, Suit
 from italian_card_games.engine.events import (
     CardPlayed,
     DomainEvent,
@@ -27,13 +27,15 @@ class IllegalMoveError(ValueError):
 
 @dataclass(slots=True)
 class Round:
-    """The state of one round: who holds what, the trick in play, and the cards won."""
+    """The state of one round: hands, trick in play, cards won, stock and trump suit."""
 
     hands: tuple[tuple[Card, ...], ...]
     dealer: SeatIndex
     leader: SeatIndex
     trick: tuple[Move, ...]
     won: tuple[tuple[Card, ...], ...]
+    stock: tuple[Card, ...] = ()
+    trump: Suit | None = None
 
     @classmethod
     def deal(cls, deck: Deck, dealer: SeatIndex, player_count: int) -> "Round":
@@ -50,7 +52,8 @@ class Round:
         """FR-11: begin a round from a deal, the seat after the dealer leads."""
         player_count = len(deal.hands)
         leader = SeatIndex((dealer.value + 1) % player_count)
-        return cls(deal.hands, dealer, leader, (), ((),) * player_count)
+        won = ((),) * player_count
+        return cls(deal.hands, dealer, leader, (), won, deal.stock, deal.trump)
 
     @property
     def current_seat(self) -> SeatIndex:
@@ -68,7 +71,7 @@ class Round:
         """FR-06: what one seat may see, its own hand and the trick in play."""
         if seat.value >= len(self.hands):
             raise ValueError(f"seat {seat.value} is out of range")
-        return PlayerView(seat, self.hands[seat.value], self.trick)
+        return PlayerView(seat, self.hands[seat.value], self.trick, self.trump)
 
     def scores(self, game: Game) -> tuple[Fraction, ...]:
         """FR-12: each seat's score from the cards it won, once the round is over."""
@@ -93,10 +96,16 @@ class Round:
         if len(trick) < len(hands):
             self.hands, self.trick = tuple(hands), trick
             return
-        winner = game.trick_winner(trick)
+        winner = game.trick_winner(trick, self.trump)
         won = list(self.won)
         won[winner.value] += tuple(m.card for m in trick)
-        self.hands, self.won = tuple(hands), tuple(won)
+        stock = self.stock
+        for offset in range(len(hands)):
+            if stock:
+                drawer = (winner.value + offset) % len(hands)
+                hands[drawer] += (stock[0],)
+                stock = stock[1:]
+        self.hands, self.won, self.stock = tuple(hands), tuple(won), stock
         self.leader, self.trick = winner, ()
 
 
