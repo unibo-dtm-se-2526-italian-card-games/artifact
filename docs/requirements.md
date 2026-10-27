@@ -55,7 +55,7 @@ IDs are stable. Tests and pull requests reference them (e.g. `FR-13`). A require
 |---|---|---|
 | FR-21 | Bots implement a common `AIStrategy` interface and receive the same player view as a human. | Two strategies are interchangeable without engine changes. |
 | FR-22 | A rule-based strategy is the baseline. It always returns a legal move. | A test plays many seeded games with four rule-based bots without an illegal move. |
-| FR-23 | Offline mode: one human plays against three bots. | A game can be completed from the UI or a CLI with one human and three bots. |
+| FR-23 | Offline mode: one human plays against bots, three in Matazza and one in Briscola. | A game of each type can be completed from the UI or a CLI with one human and the bots it needs. |
 | FR-24 | An LLM-based strategy implements the same interface. If it fails, times out, or returns an illegal move, the game falls back to the rule-based strategy for that move. | A test with a faulty LLM stub shows the fallback keeps the game going. |
 | FR-25 | *(Stretch)* A Prolog or constraint-solver strategy implements the same interface. | The strategy plays a full game with legal moves. |
 
@@ -83,7 +83,7 @@ IDs are stable. Tests and pull requests reference them (e.g. `FR-13`). A require
 |---|---|---|
 | FR-34 | The REST API uses versioned routes (`/api/v1/...`) and publishes an OpenAPI specification. | The OpenAPI document is generated and describes every route. |
 | FR-35 | Real-time lobby and match updates are delivered over WebSockets. | See FR-29. |
-| FR-36 | A web client lets a player play an offline game against three bots. | A full offline game can be played in the browser. |
+| FR-36 | A web client lets a player play an offline game against bots (FR-23). | A full offline game of each type can be played in the browser. |
 | FR-37 | The web client lets a player create or join an online lobby and play. | Two browsers can play a match together. |
 | FR-38 | The web client shows match history and statistics. | The data from FR-32 and FR-33 is visible in the UI. |
 
@@ -105,7 +105,7 @@ IDs are stable. Tests and pull requests reference them (e.g. `FR-13`). A require
 ## 4. User stories
 
 - As a player, I want to register a unique nickname that nobody else can use, so that my history and statistics are mine.
-- As a player, I want to play a game against three bots, so that I can play when no one else is available.
+- As a player, I want to play a game against bots, so that I can play when no one else is available.
 - As a player, I want to create a lobby and share a code, so that I can play with my friends.
 - As a lobby creator, I want empty seats filled with bots, so that I can start with fewer than four humans.
 - As a player, I want the game to reject illegal moves with a clear message, so that I learn the rules.
@@ -118,4 +118,3 @@ IDs are stable. Tests and pull requests reference them (e.g. `FR-13`). A require
 ## 5. Open questions
 
 - **Briscola variants (FR-20):** Briscola is specified for 2 players. A 4-player version with teams is out of scope for now and would need team support in the `Game` interface.
-- **Bots per game (FR-23, FR-36):** these say "three bots", which is right for Matazza. For Briscola the human plays against one bot.
