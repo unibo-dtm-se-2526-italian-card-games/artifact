@@ -4,7 +4,9 @@ from collections.abc import Iterator
 from itertools import chain, repeat
 from random import Random
 
-from italian_card_games.cli import play_offline
+import pytest
+
+from italian_card_games.cli import main, play_offline
 from italian_card_games.engine.briscola import BriscolaRules
 from italian_card_games.engine.matazza import MatazzaRules
 from italian_card_games.engine.ports import Game
@@ -93,6 +95,44 @@ class TestInput:
         assert is_over
         assert sum(line.startswith("Please enter a number") for line in lines) == 4
         assert human.prompts == BRISCOLA_CARDS_PER_PLAYER + 4
+
+
+class TestMain:
+    @staticmethod
+    def run(argv: list[str]) -> tuple[int, list[str]]:
+        lines: list[str] = []
+        status = main(argv, ScriptedHuman([]).read, lines.append)
+        return status, lines
+
+    def test_fr23_the_game_option_chooses_briscola(self) -> None:
+        status, lines = self.run(["--game", "briscola", "--seed", "3"])
+        assert status == 0
+        assert any(line.startswith("Trump: ") for line in lines)
+        assert "Game over" in lines
+
+    def test_fr23_the_game_option_chooses_matazza(self) -> None:
+        status, lines = self.run(["--game", "matazza", "--seed", "3"])
+        assert status == 0
+        assert any(line.startswith("Seat 3 plays ") for line in lines)
+
+    def test_fr23_matazza_is_the_default_game(self) -> None:
+        _, lines = self.run(["--seed", "3"])
+        assert any(line.startswith("Seat 3 plays ") for line in lines)
+
+    def test_fr23_a_game_without_a_seed_still_runs_to_the_end(self) -> None:
+        status, lines = self.run(["--game", "briscola"])
+        assert status == 0
+        assert "Game over" in lines
+
+    def test_nfr04_the_seed_option_makes_the_game_reproducible(self) -> None:
+        _, first = self.run(["--seed", "9"])
+        _, second = self.run(["--seed", "9"])
+        assert first == second
+
+    def test_fr23_an_unknown_game_is_refused(self) -> None:
+        with pytest.raises(SystemExit) as refused:
+            self.run(["--game", "scopa"])
+        assert refused.value.code == 2
 
 
 class TestReproducibility:
