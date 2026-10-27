@@ -1,3 +1,5 @@
-import italian_card_games
+import sys
 
-italian_card_games.main()
+from italian_card_games.cli import main
+
+sys.exit(main())

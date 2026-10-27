@@ -11,6 +11,9 @@ Developed as a project for the Software Engineering course at DTM, University of
 ```bash
 <root directory>
 ├── italian_card_games/     # main package
+│   ├── engine/             # game rules and match flow (framework-free)
+│   ├── ai/                 # bot strategies (adapters behind AIStrategy)
+│   ├── cli.py              # offline command-line game
 │   ├── __init__.py         # python package marker
 │   └── __main__.py         # application entry point
 ├── tests/                  # unit tests
@@ -63,9 +66,13 @@ poetry run poe format
 
 ### Run the application
 
+Play one offline game as seat 0 against rule-based bots (three in Matazza, one in Briscola):
+
 ```bash
-poetry run python -m italian_card_games
+poetry run python -m italian_card_games --game briscola --seed 1
 ```
+
+`--game` is `matazza` (default) or `briscola`; `--seed` fixes the shuffle. Each turn, type the number of the card to play.
 
 ## Contributing
 
