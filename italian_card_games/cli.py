@@ -1,7 +1,9 @@
-from collections.abc import Callable
+import argparse
+from collections.abc import Callable, Sequence
 from random import Random
 
 from italian_card_games.ai.rule_based import RuleBasedStrategy
+from italian_card_games.engine.briscola import BriscolaRules
 from italian_card_games.engine.events import (
     CardPlayed,
     DomainEvent,
@@ -10,10 +12,30 @@ from italian_card_games.engine.events import (
     TrickWon,
 )
 from italian_card_games.engine.match import Match
+from italian_card_games.engine.matazza import MatazzaRules
 from italian_card_games.engine.ports import AIStrategy, Game
 from italian_card_games.engine.values import Move, PlayerView, SeatIndex
 
 HUMAN_SEAT = SeatIndex(0)
+GAMES: dict[str, Callable[[], Game]] = {
+    "matazza": MatazzaRules,
+    "briscola": BriscolaRules,
+}
+DEFAULT_GAME = "matazza"
+
+
+def main(
+    argv: Sequence[str] | None = None,
+    read: Callable[[str], str] = input,
+    write: Callable[[str], None] = print,
+) -> int:
+    """FR-23: play one offline game from the command line and return the exit status."""
+    parser = argparse.ArgumentParser(prog="italian_card_games")
+    parser.add_argument("--game", choices=sorted(GAMES), default=DEFAULT_GAME)
+    parser.add_argument("--seed", type=int, default=None, help="fix the shuffle")
+    args = parser.parse_args(argv)
+    play_offline(GAMES[args.game](), read, write, Random(args.seed))
+    return 0
 
 
 def play_offline(
