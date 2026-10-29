@@ -83,7 +83,7 @@ Relations between contexts:
 | Value object | `Outcome` | `WIN`, `LOSS` or `DRAW`. |
 | Value object | `PlayerView` | Own hand, the moves on the table and the trump suit. Built by the match (FR-06). |
 | Entity | `Round` | Holds the hands, the dealer, the leader, the trick in play, the cards each seat has won, the stock and the trump suit. It validates each move against the `Game`, resolves a trick when it is complete and then lets the winner draw first from the stock. The hands, the trick and the standing points are plain tuples, not entities of their own. |
-| **Aggregate root** | `Match` | The only object outside code talks to. Built from a `Game` and an injected `Random`, it deals each round, plays moves through `Round`, scores the round, awards the standing points, rotates the dealer and ends the match. It enforces every rule and invariant of its rounds and tricks. It has no `MatchId` yet: the id is added at step 13, when a finished match is persisted. |
+| **Aggregate root** | `Match` | The only object outside code talks to. Built from a `Game` and an injected `Random`, it deals each round, plays moves through `Round`, scores the round, awards the standing points, rotates the dealer and ends the match. It enforces every rule and invariant of its rounds and tricks. It has no identity of its own: a match in play needs none, and the `MatchId` belongs to its `MatchRecord` in History. |
 | Factory | `DeckFactory` | Builds a shuffled `Deck` from an injectable random source (FR-02, NFR-04). |
 | Factory | `MatchFactory` | *Planned, not in code yet.* Builds a `Match` for a game type and a number of seats. The Lobby needs it, so it comes with the Lobby. |
 | Port (interface) | `Game` | The rules of one game: player count, deal, legal moves, trick winner, round scores, round outcomes, standing points, round holder, end conditions (FR-01, FR-03). Implemented by `MatazzaRules` and `BriscolaRules`. |
@@ -119,12 +119,20 @@ Design choices:
 
 | Kind | Name | Notes |
 |---|---|---|
-| Value object | `RoundRecord` | The score of each seat in one round (FR-31). |
-| Value object | `ParticipantRecord` | Nickname (or bot), kind, and outcome. |
-| **Aggregate root** | `MatchRecord` | Identity: the match id. Game type, participants, round records. Does not store total standing points (FR-31). |
-| Domain service | `MatchRecorder` | Consumes Gameplay events and builds the `MatchRecord`. |
-| Domain service | `StatisticsService` | Computes played, won and lost, per game type, from the records (FR-33). |
-| Repository (port) | `MatchRepository` | Stores and reads `MatchRecord`. The adapter is SQLite via SQLAlchemy. |
+| Value object | `MatchId` | The identity of a recorded match. Given to the recorder from outside, so tests stay deterministic. |
+| Value object | `Participant` | Who sits in a seat before the match is recorded: a name and whether it is a bot. |
+| Value object | `RoundRecord` | The exact `Fraction` score of each seat in one round, by seat order (FR-31). |
+| Value object | `ParticipantRecord` | Seat, name (a human's nickname or a bot's name), whether it is a bot, and outcome. |
+| **Aggregate root** | `MatchRecord` | Identity: its `MatchId`. Game type, finishing time, participants and round records. It needs at least one round, the participants fill seats 0 to n-1 in order, and every round has one score per participant. It does not store the standing points (FR-31). |
+| Value object | `GameStats` | A player's played, wins, losses and draws in one game type (FR-33). |
+| Domain service | `MatchRecorder` | Follows one match's events: keeps each `RoundScored` as a `RoundRecord` and builds the `MatchRecord` on `GameEnded`, with the finishing time from an injected clock. Every other event is ignored, and events after the end are rejected. |
+| Domain service | `StatisticsService` | Counts a nickname's results per game type from any iterable of records (FR-33). Only human seats count, so a bot with the same name is not the player. |
+| Repository (port) | `MatchRepository` | A `typing.Protocol`: `save` (an id is stored once), `get` by id, and `history_of` a nickname, oldest first. Adapters: `InMemoryMatchRepository` (no restart survival) and SQLite via SQLAlchemy. Every adapter passes the same contract tests. |
+
+- **History reads Gameplay, never the reverse.** `history/` imports the engine's events and values; `engine/` does not know History exists. `Match` is unchanged by persistence.
+- **The match id lives on the record.** A match in play needs no identity; only the stored record does.
+- **A draw is counted on its own.** `GameStats` has a `draws` counter next to wins and losses, so a Briscola tie is neither.
+- **Statistics are computed, not stored.** `StatisticsService` reads `history_of`, so the statistics always match the stored history (FR-33) and the repository needs no statistics query.
 
 ## 4. Class diagrams
 
@@ -277,23 +285,53 @@ classDiagram
         <<aggregate root>>
         +MatchId id
         +str game_type
+        +datetime finished_at
+        +tuple~ParticipantRecord~ participants
+        +tuple~RoundRecord~ rounds
+    }
+    class MatchId {
+        <<value object>>
+        +str value
     }
     class RoundRecord {
         <<value object>>
+        +tuple~Fraction~ scores
     }
     class ParticipantRecord {
         <<value object>>
+        +SeatIndex seat
+        +str name
+        +bool is_bot
+        +Outcome outcome
+    }
+    class Participant {
+        <<value object>>
+        +str name
+        +bool is_bot
     }
     class MatchRecorder {
         <<domain service>>
+        +record(events) MatchRecord
     }
     class StatisticsService {
         <<domain service>>
+        +stats_for(nickname, records) dict
+    }
+    class GameStats {
+        <<value object>>
+        +int played
+        +int wins
+        +int losses
+        +int draws
     }
     class MatchRepository {
         <<interface>>
         +save(record)
+        +get(match_id) MatchRecord
         +history_of(nickname) list~MatchRecord~
+    }
+    class InMemoryMatchRepository {
+        <<adapter>>
     }
     class LobbyRepository {
         <<interface>>
@@ -308,9 +346,13 @@ classDiagram
     Lobby --> JoinCode
     MatchRecord "1" *-- "1..*" RoundRecord
     MatchRecord "1" *-- "n" ParticipantRecord
+    MatchRecord --> MatchId
+    MatchRecorder ..> Participant : seated by
     MatchRecorder ..> MatchRecord : builds from events
     StatisticsService ..> MatchRecord : reads
+    StatisticsService ..> GameStats : computes
     MatchRepository ..> MatchRecord
+    InMemoryMatchRepository ..|> MatchRepository
     LobbyRepository ..> Lobby
 ```
 
@@ -334,12 +376,13 @@ classDiagram
 | Every seat ends with exactly one outcome, win, loss or draw. | `Match` when it emits `GameEnded` | FR-19 |
 | A player view never contains another seat's hand. | `Match.view_for` | FR-06 |
 | A record keeps round scores and outcomes but not total standing points. | `MatchRecorder`, `MatchRecord` | FR-31 |
+| A record has at least one round, its participants fill seats 0 to n-1 in order, and every round has one score per participant. | `MatchRecord` | FR-31 |
+| A match id is stored at most once. | `MatchRepository.save` in every adapter, checked by the contract tests | FR-31 |
 | A nickname is registered at most once. | `NicknameRegistry`, backed by a unique constraint in the database | FR-26 |
 | A lobby never has more seats than its game requires. *(Derived from FR-27 and FR-28.)* | `Lobby` | FR-27, FR-28 |
-| The core has no dependency on FastAPI, NiceGUI or SQLAlchemy. | Package structure | NFR-01 |
+| The core has no dependency on FastAPI, NiceGUI or SQLAlchemy. `engine/` imports none of our other packages, and `history/` imports only `engine/`. | Package structure, checked statically by `tests/test_architecture.py` | NFR-01 |
 
 ## 6. Open questions
 
 - **Standing methods on the shared port.** Briscola never uses `round_holder`, `standing_points` or `outcomes`, so it implements them as neutral stubs. A cleaner design would split the standings methods into a separate optional port that only multi-round games implement. This is left for later, and `Match` still raises an error if a game with no holder reaches the standing points.
 - **Teams.** Briscola was specified for 2 players, so `Game` has no team support. A 4-player Briscola with teams would need it in `Game`, `Outcome` and `Match`.
-- **A draw in the history.** `Outcome.DRAW` exists only for a Briscola tie. `MatchRecord` and the statistics (step 13) currently count wins and losses, so they need a rule for a draw.
