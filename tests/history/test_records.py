@@ -1,6 +1,6 @@
 """Tests for the invariants of MatchRecord (FR-31)."""
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta, timezone
 from fractions import Fraction
 
 import pytest
@@ -22,8 +22,9 @@ A_ROUND = RoundRecord((Fraction(70), Fraction(50)))
 def a_record(
     participants: tuple[ParticipantRecord, ...] = (ANNA, BOT),
     rounds: tuple[RoundRecord, ...] = (A_ROUND,),
+    finished_at: datetime = FINISHED_AT,
 ) -> MatchRecord:
-    return MatchRecord(MatchId("m-1"), "briscola", FINISHED_AT, participants, rounds)
+    return MatchRecord(MatchId("m-1"), "briscola", finished_at, participants, rounds)
 
 
 class TestMatchRecord:
@@ -54,3 +55,12 @@ class TestMatchRecord:
         short_round = RoundRecord((Fraction(120),))
         with pytest.raises(ValueError, match="score"):
             a_record(rounds=(A_ROUND, short_round))
+
+    def test_fr31_the_finishing_time_needs_a_time_zone(self) -> None:
+        with pytest.raises(ValueError, match="time zone"):
+            a_record(finished_at=datetime(2026, 10, 29, 18, 30))
+
+    def test_fr31_any_time_zone_is_accepted(self) -> None:
+        rome = timezone(timedelta(hours=1))
+        record = a_record(finished_at=datetime(2026, 10, 29, 19, 30, tzinfo=rome))
+        assert record.finished_at == FINISHED_AT

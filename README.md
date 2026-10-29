@@ -4,7 +4,7 @@ A Python library implementing classic Italian card games (e.g. Briscola, Scopa) 
 
 Developed as a project for the Software Engineering course at DTM, University of Bologna.
 
-> **Status:** Phase 1 (foundations). Documentation only, no game code yet.
+> **Status:** Phase 3 (adapters). Matazza and Briscola are playable offline against bots from the command line; finished matches can be stored in SQLite, with history and statistics. The API and web client are not built yet.
 
 ## Project structure
 
@@ -12,7 +12,9 @@ Developed as a project for the Software Engineering course at DTM, University of
 <root directory>
 ├── italian_card_games/     # main package
 │   ├── engine/             # game rules and match flow (framework-free)
+│   ├── history/            # match records, history and statistics (framework-free)
 │   ├── ai/                 # bot strategies (adapters behind AIStrategy)
+│   ├── persistence/        # MatchRepository adapters: in-memory and SQLite (SQLAlchemy)
 │   ├── cli.py              # offline command-line game
 │   ├── __init__.py         # python package marker
 │   └── __main__.py         # application entry point

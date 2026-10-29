@@ -48,6 +48,8 @@ class MatchRecord:
     rounds: tuple[RoundRecord, ...]
 
     def __post_init__(self) -> None:
+        if self.finished_at.utcoffset() is None:
+            raise ValueError("the finishing time needs a time zone")
         if not self.rounds:
             raise ValueError("a match record needs at least one round")
         seats = tuple(p.seat for p in self.participants)

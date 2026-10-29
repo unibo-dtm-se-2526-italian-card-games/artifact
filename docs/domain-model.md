@@ -123,16 +123,22 @@ Design choices:
 | Value object | `Participant` | Who sits in a seat before the match is recorded: a name and whether it is a bot. |
 | Value object | `RoundRecord` | The exact `Fraction` score of each seat in one round, by seat order (FR-31). |
 | Value object | `ParticipantRecord` | Seat, name (a human's nickname or a bot's name), whether it is a bot, and outcome. |
-| **Aggregate root** | `MatchRecord` | Identity: its `MatchId`. Game type, finishing time, participants and round records. It needs at least one round, the participants fill seats 0 to n-1 in order, and every round has one score per participant. It does not store the standing points (FR-31). |
+| **Aggregate root** | `MatchRecord` | Identity: its `MatchId`. Game type, finishing time, participants and round records. The finishing time must carry a time zone. It needs at least one round, the participants fill seats 0 to n-1 in order, and every round has one score per participant. It does not store the standing points (FR-31). |
 | Value object | `GameStats` | A player's played, wins, losses and draws in one game type (FR-33). |
 | Domain service | `MatchRecorder` | Follows one match's events: keeps each `RoundScored` as a `RoundRecord` and builds the `MatchRecord` on `GameEnded`, with the finishing time from an injected clock. Every other event is ignored, and events after the end are rejected. |
 | Domain service | `StatisticsService` | Counts a nickname's results per game type from any iterable of records (FR-33). Only human seats count, so a bot with the same name is not the player. |
-| Repository (port) | `MatchRepository` | A `typing.Protocol`: `save` (an id is stored once), `get` by id, and `history_of` a nickname, oldest first. Adapters: `InMemoryMatchRepository` (no restart survival) and SQLite via SQLAlchemy. Every adapter passes the same contract tests. |
+| Repository (port) | `MatchRepository` | A `typing.Protocol`: `save` (an id is stored once), `get` by id, and `history_of` a nickname, oldest first. Adapters in `persistence/`: `InMemoryMatchRepository` (no restart survival) and `SqlMatchRepository` (SQLite via SQLAlchemy). Every adapter passes the same contract tests. |
 
 - **History reads Gameplay, never the reverse.** `history/` imports the engine's events and values; `engine/` does not know History exists. `Match` is unchanged by persistence.
 - **The match id lives on the record.** A match in play needs no identity; only the stored record does.
 - **A draw is counted on its own.** `GameStats` has a `draws` counter next to wins and losses, so a Briscola tie is neither.
 - **Statistics are computed, not stored.** `StatisticsService` reads `history_of`, so the statistics always match the stored history (FR-33) and the repository needs no statistics query.
+- **The database has its own model.** `SqlMatchRepository` maps `MatchRecord` to three private ORM tables and back, instead of mapping the frozen domain dataclasses directly, so the domain does not depend on the storage:
+  - `matches(id, game_type, finished_at)`, keyed by `id`;
+  - `participants(match_id, seat, name, is_bot, outcome)`, keyed by `(match_id, seat)` and indexed on `name`;
+  - `round_scores(match_id, round_number, seat, score)`, one row per seat per round, keyed by all three numbers.
+
+  Scores are stored as fraction text (`"1/3"`), so they read back exactly. SQLite keeps no time zone, so times are stored in UTC and read back as UTC. The tables are created on start-up if missing; there are no migrations yet. A duplicate id is rejected by the primary key and reported as `ValueError`.
 
 ## 4. Class diagrams
 
@@ -333,6 +339,10 @@ classDiagram
     class InMemoryMatchRepository {
         <<adapter>>
     }
+    class SqlMatchRepository {
+        <<adapter>>
+        +SqlMatchRepository(engine)
+    }
     class LobbyRepository {
         <<interface>>
     }
@@ -353,6 +363,7 @@ classDiagram
     StatisticsService ..> GameStats : computes
     MatchRepository ..> MatchRecord
     InMemoryMatchRepository ..|> MatchRepository
+    SqlMatchRepository ..|> MatchRepository
     LobbyRepository ..> Lobby
 ```
 
@@ -377,7 +388,8 @@ classDiagram
 | A player view never contains another seat's hand. | `Match.view_for` | FR-06 |
 | A record keeps round scores and outcomes but not total standing points. | `MatchRecorder`, `MatchRecord` | FR-31 |
 | A record has at least one round, its participants fill seats 0 to n-1 in order, and every round has one score per participant. | `MatchRecord` | FR-31 |
-| A match id is stored at most once. | `MatchRepository.save` in every adapter, checked by the contract tests | FR-31 |
+| A match id is stored at most once. | `MatchRepository.save` in every adapter, checked by the contract tests; the primary key in SQLite | FR-31 |
+| A record's finishing time carries a time zone, so it can be stored as UTC and read back equal. | `MatchRecord` | FR-31 |
 | A nickname is registered at most once. | `NicknameRegistry`, backed by a unique constraint in the database | FR-26 |
 | A lobby never has more seats than its game requires. *(Derived from FR-27 and FR-28.)* | `Lobby` | FR-27, FR-28 |
 | The core has no dependency on FastAPI, NiceGUI or SQLAlchemy. `engine/` imports none of our other packages, and `history/` imports only `engine/`. | Package structure, checked statically by `tests/test_architecture.py` | NFR-01 |
