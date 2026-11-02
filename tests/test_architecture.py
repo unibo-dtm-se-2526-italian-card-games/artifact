@@ -15,10 +15,12 @@ PACKAGE_ROOT = Path(italian_card_games.__file__).parent
 FRAMEWORKS = {"fastapi", "nicegui", "sqlalchemy", "starlette", "pydantic"}
 CORE = ("engine", "history", "lobby")
 FORBIDDEN_INSIDE = {
-    "engine": {"ai", "cli", "history", "lobby", "persistence"},
-    "history": {"ai", "cli", "lobby", "persistence"},
-    "lobby": {"ai", "cli", "history", "persistence"},
+    "engine": {"ai", "api", "cli", "history", "lobby", "persistence"},
+    "history": {"ai", "api", "cli", "lobby", "persistence"},
+    "lobby": {"ai", "api", "cli", "history", "persistence"},
 }
+# The composition root is the one module of api/ allowed to name an adapter.
+COMPOSITION_ROOT = "api/main.py"
 
 
 def imported_modules(package: str) -> dict[str, set[str]]:
@@ -55,5 +57,36 @@ class TestCoreIsFrameworkFree:
         offending = {
             file: sorted(m for m in modules if ".".join(m.split(".")[:2]) in forbidden)
             for file, modules in imported_modules(package).items()
+        }
+        assert {file: m for file, m in offending.items() if m} == {}
+
+
+class TestApiDependsOnPorts:
+    """The API talks to ports; only the composition root may name an adapter."""
+
+    def test_nfr01_the_api_package_has_modules_to_check(self) -> None:
+        assert imported_modules("api")
+
+    def test_nfr01_only_the_composition_root_imports_sqlalchemy(self) -> None:
+        offending = {
+            file: sorted(m for m in modules if m.split(".")[0] == "sqlalchemy")
+            for file, modules in imported_modules("api").items()
+            if file != COMPOSITION_ROOT
+        }
+        assert {file: m for file, m in offending.items() if m} == {}
+
+    def test_nfr01_only_the_composition_root_imports_the_adapters(self) -> None:
+        adapters = {"italian_card_games.persistence", "italian_card_games.ai"}
+        offending = {
+            file: sorted(m for m in modules if ".".join(m.split(".")[:2]) in adapters)
+            for file, modules in imported_modules("api").items()
+            if file != COMPOSITION_ROOT
+        }
+        assert {file: m for file, m in offending.items() if m} == {}
+
+    def test_nfr01_the_api_does_not_import_the_cli(self) -> None:
+        offending = {
+            file: sorted(m for m in modules if m == "italian_card_games.cli")
+            for file, modules in imported_modules("api").items()
         }
         assert {file: m for file, m in offending.items() if m} == {}
