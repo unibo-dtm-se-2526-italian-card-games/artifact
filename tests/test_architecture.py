@@ -13,10 +13,11 @@ import italian_card_games
 
 PACKAGE_ROOT = Path(italian_card_games.__file__).parent
 FRAMEWORKS = {"fastapi", "nicegui", "sqlalchemy", "starlette", "pydantic"}
-CORE = ("engine", "history")
+CORE = ("engine", "history", "lobby")
 FORBIDDEN_INSIDE = {
-    "engine": {"ai", "cli", "history", "persistence"},
-    "history": {"ai", "cli", "persistence"},
+    "engine": {"ai", "cli", "history", "lobby", "persistence"},
+    "history": {"ai", "cli", "lobby", "persistence"},
+    "lobby": {"ai", "cli", "history", "persistence"},
 }
 
 

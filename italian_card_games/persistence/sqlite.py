@@ -19,10 +19,21 @@ from italian_card_games.history.records import (
     ParticipantRecord,
     RoundRecord,
 )
+from italian_card_games.lobby.nickname import Nickname
+from italian_card_games.lobby.player import RegisteredPlayer
 
 
 class _Base(DeclarativeBase):
     pass
+
+
+class _PlayerRow(_Base):
+    """A registered nickname. The lower-case key is the primary key, so it is unique."""
+
+    __tablename__ = "players"
+
+    key: Mapped[str] = mapped_column(primary_key=True)
+    nickname: Mapped[str]
 
 
 class _ParticipantRow(_Base):
@@ -100,6 +111,32 @@ class SqlMatchRepository:
         )
         with Session(self._engine) as session:
             return [_to_record(row) for row in session.scalars(query)]
+
+
+class SqlPlayerRepository:
+    """FR-26: a PlayerRepository on a SQL database through SQLAlchemy.
+
+    The tables are created on the injected engine if they do not exist yet.
+    """
+
+    def __init__(self, engine: Engine) -> None:
+        self._engine = engine
+        _Base.metadata.create_all(engine)
+
+    def add(self, player: RegisteredPlayer) -> None:
+        nickname = player.nickname
+        with Session(self._engine) as session:
+            session.add(_PlayerRow(key=nickname.key, nickname=nickname.value))
+            try:
+                session.commit()
+            except IntegrityError as error:
+                message = f"nickname {nickname.value} is already taken"
+                raise ValueError(message) from error
+
+    def get(self, nickname: Nickname) -> RegisteredPlayer | None:
+        with Session(self._engine) as session:
+            row = session.get(_PlayerRow, nickname.key)
+            return None if row is None else RegisteredPlayer(Nickname(row.nickname))
 
 
 def _to_row(record: MatchRecord) -> _MatchRow:
