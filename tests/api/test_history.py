@@ -82,7 +82,9 @@ class TestHistory:
         assert response.status_code == 404
         assert "anna" in response.json()["detail"]
 
-    def test_fr32_an_invalid_nickname_is_unprocessable(self, client: TestClient) -> None:
+    def test_fr32_an_invalid_nickname_is_unprocessable(
+        self, client: TestClient
+    ) -> None:
         assert client.get("/api/v1/players/ab/matches").status_code == 422
 
 
@@ -128,7 +130,9 @@ class TestStatistics:
     def test_fr33_an_unregistered_player_is_not_found(self, client: TestClient) -> None:
         assert client.get("/api/v1/players/anna/stats").status_code == 404
 
-    def test_fr33_an_invalid_nickname_is_unprocessable(self, client: TestClient) -> None:
+    def test_fr33_an_invalid_nickname_is_unprocessable(
+        self, client: TestClient
+    ) -> None:
         assert client.get("/api/v1/players/ab/stats").status_code == 422
 
 
