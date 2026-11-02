@@ -13,8 +13,9 @@ Developed as a project for the Software Engineering course at DTM, University of
 ├── italian_card_games/     # main package
 │   ├── engine/             # game rules and match flow (framework-free)
 │   ├── history/            # match records, history and statistics (framework-free)
+│   ├── lobby/              # nicknames and registered players (framework-free)
 │   ├── ai/                 # bot strategies (adapters behind AIStrategy)
-│   ├── persistence/        # MatchRepository adapters: in-memory and SQLite (SQLAlchemy)
+│   ├── persistence/        # MatchRepository and PlayerRepository adapters: in-memory and SQLite (SQLAlchemy)
 │   ├── cli.py              # offline command-line game
 │   ├── __init__.py         # python package marker
 │   └── __main__.py         # application entry point
