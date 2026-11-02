@@ -70,7 +70,9 @@ class TestSelectPlayer:
         assert response.status_code == 404
         assert "anna" in response.json()["detail"]
 
-    def test_fr26_an_invalid_nickname_is_unprocessable(self, client: TestClient) -> None:
+    def test_fr26_an_invalid_nickname_is_unprocessable(
+        self, client: TestClient
+    ) -> None:
         assert client.get("/api/v1/players/ab").status_code == 422
 
 
