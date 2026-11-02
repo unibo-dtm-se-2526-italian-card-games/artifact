@@ -2,10 +2,18 @@ from collections.abc import Callable, Mapping
 
 from fastapi import APIRouter, FastAPI, HTTPException, status
 
-from italian_card_games.api.schemas import GameInfo, NewPlayer, PlayerInfo
+from italian_card_games.api.schemas import (
+    GameInfo,
+    GameStatsInfo,
+    MatchInfo,
+    NewPlayer,
+    PlayerInfo,
+)
 from italian_card_games.engine.ports import Game
 from italian_card_games.history.ports import MatchRepository
+from italian_card_games.history.statistics import StatisticsService
 from italian_card_games.lobby.nickname import Nickname
+from italian_card_games.lobby.player import RegisteredPlayer
 from italian_card_games.lobby.ports import PlayerRepository
 from italian_card_games.lobby.registry import NicknameRegistry, NicknameTakenError
 
@@ -40,7 +48,17 @@ def create_app(
     app.state.players = players
     app.state.matches = matches
     registry = NicknameRegistry(players)
+    statistics = StatisticsService()
     router = APIRouter(prefix=API_PREFIX)
+
+    def registered_player(text: str) -> RegisteredPlayer:
+        """The player with this nickname (any case); 422 if invalid, 404 if unknown."""
+        wanted = _parse_nickname(text)
+        player = registry.find(wanted)
+        if player is None:
+            detail = f"nickname {wanted.value} is not registered"
+            raise HTTPException(status.HTTP_404_NOT_FOUND, detail)
+        return player
 
     @router.get("/games", response_model=list[GameInfo])
     def list_games() -> list[GameInfo]:
@@ -72,12 +90,31 @@ def create_app(
     )
     def get_player(nickname: str) -> PlayerInfo:
         """FR-26: select an existing player by nickname, ignoring letter case."""
-        wanted = _parse_nickname(nickname)
-        player = registry.find(wanted)
-        if player is None:
-            detail = f"nickname {wanted.value} is not registered"
-            raise HTTPException(status.HTTP_404_NOT_FOUND, detail)
+        player = registered_player(nickname)
         return PlayerInfo(nickname=player.nickname.value)
+
+    @router.get(
+        "/players/{nickname}/matches",
+        response_model=list[MatchInfo],
+        responses={status.HTTP_404_NOT_FOUND: {"description": "Not registered"}},
+    )
+    def player_history(nickname: str) -> list[MatchInfo]:
+        """FR-32: the finished matches of a player, oldest first, with round scores."""
+        player = registered_player(nickname)
+        records = matches.history_of(player.nickname.value)
+        return [MatchInfo.from_record(record) for record in records]
+
+    @router.get(
+        "/players/{nickname}/stats",
+        response_model=dict[str, GameStatsInfo],
+        responses={status.HTTP_404_NOT_FOUND: {"description": "Not registered"}},
+    )
+    def player_stats(nickname: str) -> dict[str, GameStatsInfo]:
+        """FR-33: a player's matches played, wins, losses and draws per game type."""
+        player = registered_player(nickname)
+        records = matches.history_of(player.nickname.value)
+        stats = statistics.stats_for(player.nickname.value, records)
+        return {game: GameStatsInfo.from_stats(s) for game, s in stats.items()}
 
     app.include_router(router)
     return app
