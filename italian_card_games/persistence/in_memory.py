@@ -1,4 +1,6 @@
 from italian_card_games.history.records import MatchId, MatchRecord
+from italian_card_games.lobby.nickname import Nickname
+from italian_card_games.lobby.player import RegisteredPlayer
 
 
 class InMemoryMatchRepository:
@@ -22,3 +24,19 @@ class InMemoryMatchRepository:
             if any(p.name == nickname and not p.is_bot for p in record.participants)
         ]
         return sorted(played, key=lambda record: record.finished_at)
+
+
+class InMemoryPlayerRepository:
+    """A PlayerRepository kept in a dict. It does not survive a restart."""
+
+    def __init__(self) -> None:
+        # Nickname hashes by its lower-case key, so the lookup ignores case.
+        self._players: dict[Nickname, RegisteredPlayer] = {}
+
+    def add(self, player: RegisteredPlayer) -> None:
+        if player.nickname in self._players:
+            raise ValueError(f"nickname {player.nickname.value} is already taken")
+        self._players[player.nickname] = player
+
+    def get(self, nickname: Nickname) -> RegisteredPlayer | None:
+        return self._players.get(nickname)
