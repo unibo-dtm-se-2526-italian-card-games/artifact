@@ -87,6 +87,7 @@ Relations between contexts:
 | Factory | `DeckFactory` | Builds a shuffled `Deck` from an injectable random source (FR-02, NFR-04). |
 | Factory | `MatchFactory` | *Planned, not in code yet.* Builds a `Match` for a game type and a number of seats. The Lobby needs it, so it comes with the Lobby. |
 | Port (interface) | `Game` | The rules of one game: player count, deal, legal moves, trick winner, round scores, round outcomes, standing points, round holder, end conditions (FR-01, FR-03). Implemented by `MatazzaRules` and `BriscolaRules`. |
+| Catalog | `GAMES` | In `engine/catalog.py`: the games on offer, by id (`matazza`, `briscola`), each a factory of its `Game` rules. The CLI and the API both read it, so adding a game is one line (FR-01). |
 | Port (interface) | `AIStrategy` | `choose_move(view) -> Move`. Implemented by the rule-based, LLM and (stretch) Prolog strategies (FR-21). |
 | Domain event | `CardPlayed`, `TrickWon`, `RoundScored`, `StandingPointsAwarded`, `GameEnded` | Frozen dataclasses with a common `DomainEvent` base, returned as a list by `Match.play`. A round that decides the match by itself (a Matazza solo win, or any Briscola round) ends it with `GameEnded` and no `StandingPointsAwarded`. Used for real-time updates (FR-29) and for History (FR-31). |
 
@@ -144,6 +145,27 @@ Design choices:
   - `round_scores(match_id, round_number, seat, score)`, one row per seat per round, keyed by all three numbers.
 
   Scores are stored as fraction text (`"1/3"`), so they read back exactly. SQLite keeps no time zone, so times are stored in UTC and read back as UTC. The tables are created on start-up if missing; there are no migrations yet. A duplicate id is rejected by the primary key and reported as `ValueError`.
+
+### 3.4 REST API (driving adapter)
+
+The API is not a bounded context. It is an adapter in `api/` that calls the Lobby and History through their ports and holds no rules of its own.
+
+| Route | Requirement | Result |
+|---|---|---|
+| `GET /api/v1/games` | FR-34 | `200`: each game id with its player count, sorted by id |
+| `POST /api/v1/players` | FR-26 | `201` new nickname; `409` taken (any case); `422` invalid |
+| `GET /api/v1/players/{nickname}` | FR-26 | `200` with the stored casing; `404` unknown; `422` invalid |
+| `GET /api/v1/players/{nickname}/matches` | FR-32 | `200`: finished matches oldest first, with participants and round scores; `404`; `422` |
+| `GET /api/v1/players/{nickname}/stats` | FR-33 | `200`: played, wins, losses and draws per game type; `404`; `422` |
+
+The OpenAPI document is at `/api/v1/openapi.json` and the interactive docs at `/api/v1/docs`. Every route has a description, which a test checks (FR-34).
+
+- **The app takes ports.** `create_app(players, matches, games)` receives a `PlayerRepository`, a `MatchRepository` and the game catalog, and never builds an adapter. `build_app` in `api/main.py` is the composition root: it creates one SQLAlchemy engine from `ICG_DATABASE_URL` (default a local SQLite file), builds the two SQL repositories on it and calls `create_app`. It is the only module of `api/` that names an adapter (NFR-01).
+- **Selecting and registering are different routes.** `POST /players` registers, `GET /players/{nickname}` selects an existing player. No token is involved, in line with the no-ownership rule.
+- **The domain decides what is valid.** The route builds a `Nickname` and turns its `ValueError` into `422`; `NicknameTakenError` becomes `409`. The API has no copy of the nickname rules.
+- **History uses the registered casing.** The routes look the player up through `NicknameRegistry.find` and query with the stored casing, because recorded participant names are compared exactly. An unregistered nickname is `404`, even if a bot has that name.
+- **Wire format.** Pydantic models exist only in `api/`. Round scores are strings such as `"1/3"`, so they stay exact (FR-12); times are ISO 8601 in UTC; outcomes are `win`, `loss` or `draw`.
+- **Not built yet.** Playing a match through the API (create, view, play a move) comes with `feature/api-offline-match`, and the lobby and WebSockets with step 15.
 
 ## 4. Class diagrams
 
@@ -419,7 +441,7 @@ classDiagram
 | Two nicknames that differ only in letter case are the same name. | `Nickname`, through its lower-case `key` | FR-26 |
 | A nickname is registered at most once, in any case. | `NicknameRegistry`, backed by `PlayerRepository.add` in every adapter (checked by the contract tests) and the primary key on the lower-case key in SQLite | FR-26 |
 | A lobby never has more seats than its game requires. *(Derived from FR-27 and FR-28.)* | `Lobby` | FR-27, FR-28 |
-| The core has no dependency on FastAPI, NiceGUI or SQLAlchemy. `engine/` imports none of our other packages, and `history/` and `lobby/` import only `engine/`. | Package structure, checked statically by `tests/test_architecture.py` | NFR-01 |
+| The core has no dependency on FastAPI, NiceGUI or SQLAlchemy. `engine/` imports none of our other packages, and `history/` and `lobby/` import only `engine/`. `api/` depends on ports and may use FastAPI and Pydantic; only `api/main.py` imports SQLAlchemy or an adapter, and nothing in `api/` imports the CLI. | Package structure, checked statically by `tests/test_architecture.py` | NFR-01 |
 
 ## 6. Open questions
 

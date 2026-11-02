@@ -4,7 +4,7 @@ A Python library implementing classic Italian card games (e.g. Briscola, Scopa) 
 
 Developed as a project for the Software Engineering course at DTM, University of Bologna.
 
-> **Status:** Phase 3 (adapters). Matazza and Briscola are playable offline against bots from the command line; finished matches can be stored in SQLite, with history and statistics. The API and web client are not built yet.
+> **Status:** Phase 3 (adapters). Matazza and Briscola are playable offline against bots from the command line; finished matches can be stored in SQLite, with history and statistics. A REST API (`/api/v1`) registers players and serves their match history and statistics. Playing a match through the API, the lobby and the web client are not built yet.
 
 ## Project structure
 
@@ -14,6 +14,7 @@ Developed as a project for the Software Engineering course at DTM, University of
 │   ├── engine/             # game rules and match flow (framework-free)
 │   ├── history/            # match records, history and statistics (framework-free)
 │   ├── lobby/              # nicknames and registered players (framework-free)
+│   ├── api/                # REST API (FastAPI): routes on the ports, composition root in main.py
 │   ├── ai/                 # bot strategies (adapters behind AIStrategy)
 │   ├── persistence/        # MatchRepository and PlayerRepository adapters: in-memory and SQLite (SQLAlchemy)
 │   ├── cli.py              # offline command-line game
@@ -76,6 +77,14 @@ poetry run python -m italian_card_games --game briscola --seed 1
 ```
 
 `--game` is `matazza` (default) or `briscola`; `--seed` fixes the shuffle. Each turn, type the number of the card to play.
+
+### Run the REST API
+
+```bash
+poetry run uvicorn italian_card_games.api.main:build_app --factory
+```
+
+The data is kept in a SQLite file, `italian_card_games.db` in the current directory; set `ICG_DATABASE_URL` (for example `sqlite:///other.db`) to use another database. The OpenAPI document is at `/api/v1/openapi.json` and the interactive docs at `/api/v1/docs`. Routes: `GET /api/v1/games`, `POST /api/v1/players`, `GET /api/v1/players/{nickname}`, and `GET /api/v1/players/{nickname}/matches` and `/stats`.
 
 ## Contributing
 

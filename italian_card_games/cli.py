@@ -3,7 +3,7 @@ from collections.abc import Callable, Sequence
 from random import Random
 
 from italian_card_games.ai.rule_based import RuleBasedStrategy
-from italian_card_games.engine.briscola import BriscolaRules
+from italian_card_games.engine.catalog import GAMES
 from italian_card_games.engine.events import (
     CardPlayed,
     DomainEvent,
@@ -12,15 +12,10 @@ from italian_card_games.engine.events import (
     TrickWon,
 )
 from italian_card_games.engine.match import Match
-from italian_card_games.engine.matazza import MatazzaRules
 from italian_card_games.engine.ports import AIStrategy, Game
 from italian_card_games.engine.values import Move, PlayerView, SeatIndex
 
 HUMAN_SEAT = SeatIndex(0)
-GAMES: dict[str, Callable[[], Game]] = {
-    "matazza": MatazzaRules,
-    "briscola": BriscolaRules,
-}
 DEFAULT_GAME = "matazza"
 
 
