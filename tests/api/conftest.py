@@ -11,11 +11,17 @@ from italian_card_games.persistence.in_memory import (
 
 
 @pytest.fixture
-def client() -> TestClient:
+def matches() -> InMemoryMatchRepository:
+    """The match store behind `client`, so a test can put finished matches in it."""
+    return InMemoryMatchRepository()
+
+
+@pytest.fixture
+def client(matches: InMemoryMatchRepository) -> TestClient:
     """The API on empty in-memory repositories."""
     app = create_app(
         players=InMemoryPlayerRepository(),
-        matches=InMemoryMatchRepository(),
+        matches=matches,
         games={"matazza": MatazzaRules, "briscola": BriscolaRules},
     )
     return TestClient(app)
