@@ -154,8 +154,9 @@ class TestMove:
         response = play(client, created["id"], card_not_in(created["hand"]))
 
         assert response.status_code == 409
-        assert client.get(f"/api/v1/matches/{created['id']}").json()["hand"] == (
-            created["hand"]
+        assert (
+            client.get(f"/api/v1/matches/{created['id']}").json()["hand"]
+            == (created["hand"])
         )
 
     @pytest.mark.parametrize(
