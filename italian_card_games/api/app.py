@@ -3,19 +3,29 @@ from collections.abc import Callable, Mapping
 from fastapi import APIRouter, FastAPI, HTTPException, status
 
 from italian_card_games.api.schemas import (
+    CardInfo,
     GameInfo,
     GameStatsInfo,
     MatchInfo,
+    MatchState,
+    NewMatch,
     NewPlayer,
     PlayerInfo,
 )
+from italian_card_games.engine.match import IllegalMoveError
 from italian_card_games.engine.ports import Game
 from italian_card_games.history.ports import MatchRepository
+from italian_card_games.history.records import MatchId
 from italian_card_games.history.statistics import StatisticsService
 from italian_card_games.lobby.nickname import Nickname
 from italian_card_games.lobby.player import RegisteredPlayer
 from italian_card_games.lobby.ports import PlayerRepository
 from italian_card_games.lobby.registry import NicknameRegistry, NicknameTakenError
+from italian_card_games.play.service import (
+    MatchNotFoundError,
+    OfflineMatchService,
+    UnknownGameError,
+)
 
 API_PREFIX = "/api/v1"
 
@@ -33,11 +43,14 @@ def create_app(
     players: PlayerRepository,
     matches: MatchRepository,
     games: Mapping[str, Callable[[], Game]],
+    offline_matches: OfflineMatchService,
 ) -> FastAPI:
     """FR-34: build the REST API on the given ports; it never builds an adapter itself.
 
-    `games` maps a game id to a factory of its rules. Every route lives under
-    /api/v1, and the OpenAPI document is published at /api/v1/openapi.json.
+    `games` maps a game id to a factory of its rules. `offline_matches` runs the
+    matches against bots; the caller builds it with its clock, ids and bots. Every
+    route lives under /api/v1, and the OpenAPI document is published at
+    /api/v1/openapi.json.
     """
     app = FastAPI(
         title="italian_card_games",
@@ -115,6 +128,59 @@ def create_app(
         records = matches.history_of(player.nickname.value)
         stats = statistics.stats_for(player.nickname.value, records)
         return {game: GameStatsInfo.from_stats(s) for game, s in stats.items()}
+
+    @router.post(
+        "/matches",
+        response_model=MatchState,
+        status_code=status.HTTP_201_CREATED,
+        responses={status.HTTP_404_NOT_FOUND: {"description": "Not registered"}},
+    )
+    def start_match(body: NewMatch) -> MatchState:
+        """FR-23, FR-36: start an offline match for a registered player against bots.
+
+        The player sits on seat 0 and the bots have already played when the state is
+        returned. An unknown game is a 422; a seed makes the shuffle repeatable.
+        """
+        player = registered_player(body.nickname)
+        try:
+            started = offline_matches.start(player.nickname.value, body.game, body.seed)
+        except UnknownGameError as error:
+            raise HTTPException(422, str(error)) from error
+        return MatchState.from_status(started)
+
+    @router.get(
+        "/matches/{match_id}",
+        response_model=MatchState,
+        responses={status.HTTP_404_NOT_FOUND: {"description": "Unknown match"}},
+    )
+    def get_match(match_id: str) -> MatchState:
+        """FR-23: the current state of an offline match, as seen from seat 0."""
+        try:
+            current = offline_matches.status(MatchId(match_id))
+        except MatchNotFoundError as error:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, str(error)) from error
+        return MatchState.from_status(current)
+
+    @router.post(
+        "/matches/{match_id}/moves",
+        response_model=MatchState,
+        responses={
+            status.HTTP_404_NOT_FOUND: {"description": "Unknown match"},
+            status.HTTP_409_CONFLICT: {"description": "Illegal move"},
+        },
+    )
+    def play_move(match_id: str, card: CardInfo) -> MatchState:
+        """FR-23, FR-36: play a card from the hand; the bots reply, then the state.
+
+        A card the rules do not allow, or any card once the match is over, is a 409.
+        """
+        try:
+            played = offline_matches.play(MatchId(match_id), card.to_card())
+        except MatchNotFoundError as error:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, str(error)) from error
+        except IllegalMoveError as error:
+            raise HTTPException(status.HTTP_409_CONFLICT, str(error)) from error
+        return MatchState.from_status(played)
 
     app.include_router(router)
     return app
