@@ -92,8 +92,6 @@ The data is kept in a SQLite file, `italian_card_games.db` in the current direct
 - Commit messages follow [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/), since `semantic-release` computes version numbers from them.
 - CI runs on all pushes, on multiple OS (Windows, macOS, Ubuntu) and Python versions.
 
-See [docs/WORKFLOW_GUIDE.md](docs/WORKFLOW_GUIDE.md) for the full workflow.
-
 ## License
 
 Distributed under the [Apache License 2.0](LICENSE).
