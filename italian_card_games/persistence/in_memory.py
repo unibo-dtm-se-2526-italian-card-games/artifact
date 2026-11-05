@@ -1,6 +1,7 @@
 from italian_card_games.history.records import MatchId, MatchRecord
 from italian_card_games.lobby.nickname import Nickname
 from italian_card_games.lobby.player import RegisteredPlayer
+from italian_card_games.play.session import MatchSession
 
 
 class InMemoryMatchRepository:
@@ -40,3 +41,18 @@ class InMemoryPlayerRepository:
 
     def get(self, nickname: Nickname) -> RegisteredPlayer | None:
         return self._players.get(nickname)
+
+
+class InMemorySessionStore:
+    """A SessionStore kept in a dict. Matches in play do not survive a restart."""
+
+    def __init__(self) -> None:
+        self._sessions: dict[MatchId, MatchSession] = {}
+
+    def add(self, match_id: MatchId, session: MatchSession) -> None:
+        if match_id in self._sessions:
+            raise ValueError(f"session {match_id.value} is already stored")
+        self._sessions[match_id] = session
+
+    def get(self, match_id: MatchId) -> MatchSession | None:
+        return self._sessions.get(match_id)

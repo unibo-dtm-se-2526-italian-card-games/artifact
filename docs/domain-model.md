@@ -157,15 +157,36 @@ The API is not a bounded context. It is an adapter in `api/` that calls the Lobb
 | `GET /api/v1/players/{nickname}` | FR-26 | `200` with the stored casing; `404` unknown; `422` invalid |
 | `GET /api/v1/players/{nickname}/matches` | FR-32 | `200`: finished matches oldest first, with participants and round scores; `404`; `422` |
 | `GET /api/v1/players/{nickname}/stats` | FR-33 | `200`: played, wins, losses and draws per game type; `404`; `422` |
+| `POST /api/v1/matches` | FR-23, FR-36 | `201`: a new offline match with the bots already played; `404` unregistered player; `422` unknown game or invalid input |
+| `GET /api/v1/matches/{match_id}` | FR-23 | `200`: the state seen from seat 0; `404` unknown match |
+| `POST /api/v1/matches/{match_id}/moves` | FR-23, FR-36 | `200`: the state after the move and the bots' replies; `404` unknown match; `409` illegal move or match over; `422` malformed card |
 
 The OpenAPI document is at `/api/v1/openapi.json` and the interactive docs at `/api/v1/docs`. Every route has a description, which a test checks (FR-34).
 
-- **The app takes ports.** `create_app(players, matches, games)` receives a `PlayerRepository`, a `MatchRepository` and the game catalog, and never builds an adapter. `build_app` in `api/main.py` is the composition root: it creates one SQLAlchemy engine from `ICG_DATABASE_URL` (default a local SQLite file), builds the two SQL repositories on it and calls `create_app`. It is the only module of `api/` that names an adapter (NFR-01).
+- **The app takes ports.** `create_app(players, matches, games, offline_matches)` receives a `PlayerRepository`, a `MatchRepository`, the game catalog and an `OfflineMatchService`, and never builds an adapter. `build_app` in `api/main.py` is the composition root: it creates one SQLAlchemy engine from `ICG_DATABASE_URL` (default a local SQLite file), builds the two SQL repositories on it, builds the `OfflineMatchService` with `RuleBasedStrategy` as the bot factory, a UTC clock and `uuid4` ids, and calls `create_app`. It is the only module of `api/` that names an adapter (NFR-01).
 - **Selecting and registering are different routes.** `POST /players` registers, `GET /players/{nickname}` selects an existing player. No token is involved, in line with the no-ownership rule.
 - **The domain decides what is valid.** The route builds a `Nickname` and turns its `ValueError` into `422`; `NicknameTakenError` becomes `409`. The API has no copy of the nickname rules.
 - **History uses the registered casing.** The routes look the player up through `NicknameRegistry.find` and query with the stored casing, because recorded participant names are compared exactly. An unregistered nickname is `404`, even if a bot has that name.
 - **Wire format.** Pydantic models exist only in `api/`. Round scores are strings such as `"1/3"`, so they stay exact (FR-12); times are ISO 8601 in UTC; outcomes are `win`, `loss` or `draw`.
-- **Not built yet.** Playing a match through the API (create, view, play a move) comes with `feature/api-offline-match`, and the lobby and WebSockets with step 15.
+- **Cards and events on the wire.** A card is `{"suit": "denari", "rank": 3}`; a malformed one is a `422`. The events of a call are a list tagged by `type` (`card_played`, `trick_won`, `round_scored`, `standing_points_awarded`, `game_ended`), each carrying only its own fields.
+- **Not built yet.** The lobby and WebSockets come with step 15.
+
+### 3.5 Offline play (application service)
+
+`play/` runs a match of one human against bots. It is not a bounded context: it only composes `engine/` (the `Match`) and `history/` (the recorder and the repository port), so it depends on those two and on nothing else (NFR-01).
+
+| Element | Name | Notes |
+|---|---|---|
+| Application service | `OfflineMatchService` | `start(nickname, game_id, seed)`, `status(match_id)` and `play(match_id, card)`. The game catalog, repository, session store, bot factory, clock and id generator are all injected. |
+| Value | `MatchStatus` | What a call returns: match id, game id, the human's `PlayerView`, the seat to move, the outcomes if the match is over, and the events of that call. |
+| Session | `MatchSession` | The `Match` in play, its bots by seat and its `MatchRecorder`. |
+| Port | `SessionStore` | A `typing.Protocol`: `add` (a used id raises `ValueError`) and `get`. Adapter in `persistence/`: `InMemorySessionStore`, so matches in play do not survive a restart. |
+| Errors | `UnknownGameError`, `MatchNotFoundError` | The engine's `IllegalMoveError` is reused for a rejected move. |
+
+- **The human is always seat 0.** The bots take the other seats, named `Bot 1`, `Bot 2`, and so on. There is no token: the match id in the URL is the only handle, in line with the no-ownership rule for nicknames.
+- **Bots reply inside the call.** After `start` and after every `play`, the bots move until it is seat 0's turn again or the match ends.
+- **Recorded once.** `_apply` is the only place a move is played; it feeds the events to the `MatchRecorder` and saves the record when the move ends the match. A finished session stays readable, and any further move is rejected by the `Match`.
+- **A seed makes a match repeatable.** The seed feeds one `Random` shared by the match and the bots, as in the CLI.
 
 ## 4. Class diagrams
 
@@ -441,7 +462,7 @@ classDiagram
 | Two nicknames that differ only in letter case are the same name. | `Nickname`, through its lower-case `key` | FR-26 |
 | A nickname is registered at most once, in any case. | `NicknameRegistry`, backed by `PlayerRepository.add` in every adapter (checked by the contract tests) and the primary key on the lower-case key in SQLite | FR-26 |
 | A lobby never has more seats than its game requires. *(Derived from FR-27 and FR-28.)* | `Lobby` | FR-27, FR-28 |
-| The core has no dependency on FastAPI, NiceGUI or SQLAlchemy. `engine/` imports none of our other packages, and `history/` and `lobby/` import only `engine/`. `api/` depends on ports and may use FastAPI and Pydantic; only `api/main.py` imports SQLAlchemy or an adapter, and nothing in `api/` imports the CLI. | Package structure, checked statically by `tests/test_architecture.py` | NFR-01 |
+| The core has no dependency on FastAPI, NiceGUI or SQLAlchemy. `engine/` imports none of our other packages, `history/` and `lobby/` import only `engine/`, and `play/` imports only `engine/` and `history/`. `api/` depends on ports and may use FastAPI and Pydantic; only `api/main.py` imports SQLAlchemy or an adapter, and nothing in `api/` imports the CLI. | Package structure, checked statically by `tests/test_architecture.py` | NFR-01 |
 
 ## 6. Open questions
 

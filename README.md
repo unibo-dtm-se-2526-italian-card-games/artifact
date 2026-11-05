@@ -4,7 +4,7 @@ A Python library implementing classic Italian card games (e.g. Briscola, Scopa) 
 
 Developed as a project for the Software Engineering course at DTM, University of Bologna.
 
-> **Status:** Phase 3 (adapters). Matazza and Briscola are playable offline against bots from the command line; finished matches can be stored in SQLite, with history and statistics. A REST API (`/api/v1`) registers players and serves their match history and statistics. Playing a match through the API, the lobby and the web client are not built yet.
+> **Status:** Phase 3 (adapters). Matazza and Briscola are playable offline against bots from the command line; finished matches can be stored in SQLite, with history and statistics. A REST API (`/api/v1`) registers players, serves their match history and statistics, and lets a registered player play a match against bots. The lobby and the web client are not built yet.
 
 ## Project structure
 
@@ -14,9 +14,10 @@ Developed as a project for the Software Engineering course at DTM, University of
 │   ├── engine/             # game rules and match flow (framework-free)
 │   ├── history/            # match records, history and statistics (framework-free)
 │   ├── lobby/              # nicknames and registered players (framework-free)
+│   ├── play/               # offline matches against bots: service and session (framework-free)
 │   ├── api/                # REST API (FastAPI): routes on the ports, composition root in main.py
 │   ├── ai/                 # bot strategies (adapters behind AIStrategy)
-│   ├── persistence/        # MatchRepository and PlayerRepository adapters: in-memory and SQLite (SQLAlchemy)
+│   ├── persistence/        # MatchRepository, PlayerRepository and SessionStore adapters: in-memory and SQLite (SQLAlchemy)
 │   ├── cli.py              # offline command-line game
 │   ├── __init__.py         # python package marker
 │   └── __main__.py         # application entry point
@@ -84,15 +85,13 @@ poetry run python -m italian_card_games --game briscola --seed 1
 poetry run uvicorn italian_card_games.api.main:build_app --factory
 ```
 
-The data is kept in a SQLite file, `italian_card_games.db` in the current directory; set `ICG_DATABASE_URL` (for example `sqlite:///other.db`) to use another database. The OpenAPI document is at `/api/v1/openapi.json` and the interactive docs at `/api/v1/docs`. Routes: `GET /api/v1/games`, `POST /api/v1/players`, `GET /api/v1/players/{nickname}`, and `GET /api/v1/players/{nickname}/matches` and `/stats`.
+The data is kept in a SQLite file, `italian_card_games.db` in the current directory; set `ICG_DATABASE_URL` (for example `sqlite:///other.db`) to use another database. The OpenAPI document is at `/api/v1/openapi.json` and the interactive docs at `/api/v1/docs`. Routes: `GET /api/v1/games`, `POST /api/v1/players`, `GET /api/v1/players/{nickname}`, and `GET /api/v1/players/{nickname}/matches` and `/stats`. To play against the bots, `POST /api/v1/matches` with `{"nickname": "...", "game": "matazza"}` starts a match (add `"seed"` to repeat a shuffle), `GET /api/v1/matches/{id}` shows it, and `POST /api/v1/matches/{id}/moves` with a card such as `{"suit": "denari", "rank": 3}` plays it. The player must be registered first, and matches in play are kept in memory, so a restart loses them; finished ones stay in the database.
 
 ## Contributing
 
 - One branch per piece of work, one pull request into `develop`; `develop` is merged into `main` for releases.
 - Commit messages follow [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/), since `semantic-release` computes version numbers from them.
 - CI runs on all pushes, on multiple OS (Windows, macOS, Ubuntu) and Python versions.
-
-See [docs/WORKFLOW_GUIDE.md](docs/WORKFLOW_GUIDE.md) for the full workflow.
 
 ## License
 

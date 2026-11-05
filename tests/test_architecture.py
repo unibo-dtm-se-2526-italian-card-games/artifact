@@ -13,11 +13,12 @@ import italian_card_games
 
 PACKAGE_ROOT = Path(italian_card_games.__file__).parent
 FRAMEWORKS = {"fastapi", "nicegui", "sqlalchemy", "starlette", "pydantic"}
-CORE = ("engine", "history", "lobby")
+CORE = ("engine", "history", "lobby", "play")
 FORBIDDEN_INSIDE = {
-    "engine": {"ai", "api", "cli", "history", "lobby", "persistence"},
-    "history": {"ai", "api", "cli", "lobby", "persistence"},
-    "lobby": {"ai", "api", "cli", "history", "persistence"},
+    "engine": {"ai", "api", "cli", "history", "lobby", "persistence", "play"},
+    "history": {"ai", "api", "cli", "lobby", "persistence", "play"},
+    "lobby": {"ai", "api", "cli", "history", "persistence", "play"},
+    "play": {"ai", "api", "cli", "lobby", "persistence"},
 }
 # The composition root is the one module of api/ allowed to name an adapter.
 COMPOSITION_ROOT = "api/main.py"
