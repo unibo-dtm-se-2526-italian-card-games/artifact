@@ -1,3 +1,4 @@
+from collections.abc import Callable
 from datetime import UTC, datetime
 from itertools import count
 from random import Random
@@ -10,6 +11,7 @@ from italian_card_games.engine.cards import Card, DeckFactory
 from italian_card_games.engine.events import CardPlayed
 from italian_card_games.engine.match import IllegalMoveError
 from italian_card_games.engine.matazza import MatazzaRules
+from italian_card_games.engine.ports import Game
 from italian_card_games.engine.values import Outcome, SeatIndex
 from italian_card_games.history.records import MatchId
 from italian_card_games.persistence.in_memory import (
@@ -25,7 +27,10 @@ from italian_card_games.play.service import (
 
 HUMAN = SeatIndex(0)
 NOW = datetime(2026, 11, 5, 12, 0, tzinfo=UTC)
-GAMES = {"matazza": MatazzaRules, "briscola": BriscolaRules}
+GAMES: dict[str, Callable[[], Game]] = {
+    "matazza": MatazzaRules,
+    "briscola": BriscolaRules,
+}
 
 
 @pytest.fixture
