@@ -104,9 +104,7 @@ class Lobby:
             raise NotCreatorError("only the creator can start the match")
         self.fill_with_bots()
         self._started = True
-        return tuple(
-            seat.occupant for seat in self._seats if seat.occupant is not None
-        )
+        return tuple(seat.occupant for seat in self._seats if seat.occupant is not None)
 
     def _ensure_not_started(self) -> None:
         if self._started:
