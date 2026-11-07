@@ -14,7 +14,7 @@ Developed as a project for the Software Engineering course at DTM, University of
 │   ├── engine/             # game rules and match flow (framework-free)
 │   ├── history/            # match records, history and statistics (framework-free)
 │   ├── lobby/              # nicknames, registered players, lobbies and join codes (framework-free)
-│   ├── play/               # offline matches against bots: service and session (framework-free)
+│   ├── play/               # matches against bots, offline and online: services, runner and session (framework-free)
 │   ├── api/                # REST API (FastAPI): routes on the ports, composition root in main.py
 │   ├── ai/                 # bot strategies (adapters behind AIStrategy)
 │   ├── persistence/        # MatchRepository, PlayerRepository, LobbyRepository and SessionStore adapters: in-memory and SQLite (SQLAlchemy)
