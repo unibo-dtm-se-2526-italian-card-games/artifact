@@ -172,21 +172,25 @@ The OpenAPI document is at `/api/v1/openapi.json` and the interactive docs at `/
 - **Cards and events on the wire.** A card is `{"suit": "denari", "rank": 3}`; a malformed one is a `422`. The events of a call are a list tagged by `type` (`card_played`, `trick_won`, `round_scored`, `standing_points_awarded`, `game_ended`), each carrying only its own fields.
 - **Not built yet.** The lobby and WebSockets come with step 15.
 
-### 3.5 Offline play (application service)
+### 3.5 Offline and online play (application services)
 
-`play/` runs a match of one human against bots. It is not a bounded context: it only composes `engine/` (the `Match`) and `history/` (the recorder and the repository port), so it depends on those two and on nothing else (NFR-01).
+`play/` runs matches of one or more humans against bots. It is not a bounded context: it only composes `engine/` (the `Match`) and `history/` (the recorder and the repository port), so it depends on those two and on nothing else (NFR-01).
 
 | Element | Name | Notes |
 |---|---|---|
-| Application service | `OfflineMatchService` | `start(nickname, game_id, seed)`, `status(match_id)` and `play(match_id, card)`. The game catalog, repository, session store, bot factory, clock and id generator are all injected. |
-| Value | `MatchStatus` | What a call returns: match id, game id, the human's `PlayerView`, the seat to move, the outcomes if the match is over, and the events of that call. |
+| Application service | `OfflineMatchService` | One human on seat 0. `start(nickname, game_id, seed)`, `status(match_id)` and `play(match_id, card)`. The game catalog, repository, session store, bot factory, clock and id generator are all injected. |
+| Application service | `OnlineMatchService` | Several humans (FR-27, FR-28). `start(game_id, humans, seed)` takes the human seats and their names and returns the `MatchId`; `status(match_id, seat)` and `play(match_id, seat, card)` act for one human seat. Same injected dependencies as the offline service. |
+| Runner | `MatchRunner` | `apply(session, move)` plays one move and saves the record if it ended the match; `bots_reply(session)` lets the bots move until a human's turn or the end. Both services use it. |
+| Value | `MatchStatus` | What a call returns: match id, game id, the caller's own `PlayerView`, the seat to move, the outcomes if the match is over, and the events of that call. |
 | Session | `MatchSession` | The `Match` in play, its bots by seat and its `MatchRecorder`. |
 | Port | `SessionStore` | A `typing.Protocol`: `add` (a used id raises `ValueError`) and `get`. Adapter in `persistence/`: `InMemorySessionStore`, so matches in play do not survive a restart. |
 | Errors | `UnknownGameError`, `MatchNotFoundError` | The engine's `IllegalMoveError` is reused for a rejected move. |
 
-- **The human is always seat 0.** The bots take the other seats, named `Bot 1`, `Bot 2`, and so on. There is no token: the match id in the URL is the only handle, in line with the no-ownership rule for nicknames.
-- **Bots reply inside the call.** After `start` and after every `play`, the bots move until it is seat 0's turn again or the match ends.
-- **Recorded once.** `_apply` is the only place a move is played; it feeds the events to the `MatchRecorder` and saves the record when the move ends the match. A finished session stays readable, and any further move is rejected by the `Match`.
+- **Offline: the human is always seat 0.** The bots take the other seats, named `Bot 1`, `Bot 2`, and so on. There is no token: the match id in the URL is the only handle, in line with the no-ownership rule for nicknames.
+- **Bots reply inside the call.** After `start` and after every `play`, the bots move until it is a human's turn again or the match ends. A seat is a bot's if the session holds a bot for it, so one human or several share the same loop.
+- **Online: humans are the seats the caller names.** Every other seat gets a bot named `Bot <seat>`; the record uses the human's name or the bot's. `status` and `play` reject a seat held by a bot with `ValueError`, a seat outside the table likewise, and a move out of turn or not allowed with the engine's `IllegalMoveError`. Each call returns only the caller's own view, so the other hands stay hidden. `play/` knows nothing about lobbies or tokens: it takes plain seats and names.
+- **Offline and online matches use separate session stores.** An online match id is shown to everyone in the lobby, and the offline `GET /matches/{id}` has no token, so a shared store would let anyone with the id read seat 0's hand.
+- **Recorded once.** `MatchRunner.apply` is the only place a move is played; it feeds the events to the `MatchRecorder` and saves the record when the move ends the match. A finished session stays readable, and any further move is rejected by the `Match`.
 - **A seed makes a match repeatable.** The seed feeds one `Random` shared by the match and the bots, as in the CLI.
 
 ## 4. Class diagrams
