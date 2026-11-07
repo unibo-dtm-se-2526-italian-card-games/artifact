@@ -12,6 +12,7 @@ from italian_card_games.history.ports import MatchRepository
 from italian_card_games.history.recorder import MatchRecorder
 from italian_card_games.history.records import MatchId, Participant
 from italian_card_games.play.ports import SessionStore
+from italian_card_games.play.runner import MatchRunner
 from italian_card_games.play.session import MatchSession
 
 HUMAN_SEAT = SeatIndex(0)
@@ -59,7 +60,7 @@ class OfflineMatchService:
         new_match_id: Callable[[], MatchId],
     ) -> None:
         self._games = games
-        self._matches = matches
+        self._runner = MatchRunner(matches)
         self._sessions = sessions
         self._bot_factory = bot_factory
         self._clock = clock
@@ -84,7 +85,7 @@ class OfflineMatchService:
         recorder = MatchRecorder(match_id, game_id, participants, self._clock)
         session = MatchSession(game_id, Match(game, rng), bots, recorder)
         self._sessions.add(match_id, session)
-        return self._status(match_id, session, self._bots_reply(session))
+        return self._status(match_id, session, self._runner.bots_reply(session))
 
     def status(self, match_id: MatchId) -> MatchStatus:
         """The current state of a match, with no events."""
@@ -96,8 +97,8 @@ class OfflineMatchService:
         An illegal card, or any card once the match is over, raises IllegalMoveError.
         """
         session = self._session(match_id)
-        events = self._apply(session, Move(HUMAN_SEAT, card))
-        events += self._bots_reply(session)
+        events = self._runner.apply(session, Move(HUMAN_SEAT, card))
+        events += self._runner.bots_reply(session)
         return self._status(match_id, session, events)
 
     def _session(self, match_id: MatchId) -> MatchSession:
@@ -105,23 +106,6 @@ class OfflineMatchService:
         if session is None:
             raise MatchNotFoundError(f"no match {match_id.value}")
         return session
-
-    def _bots_reply(self, session: MatchSession) -> list[DomainEvent]:
-        events: list[DomainEvent] = []
-        match = session.match
-        while not match.is_over and match.current_seat != HUMAN_SEAT:
-            seat = match.current_seat
-            move = session.bots[seat].choose_move(match.view_for(seat))
-            events += self._apply(session, move)
-        return events
-
-    def _apply(self, session: MatchSession, move: Move) -> list[DomainEvent]:
-        """Play one move, and save the record if it ended the match."""
-        events = session.match.play(move)
-        record = session.recorder.record(events)
-        if record is not None:
-            self._matches.save(record)
-        return events
 
     @staticmethod
     def _status(
