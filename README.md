@@ -4,7 +4,7 @@ A Python library implementing classic Italian card games (e.g. Briscola, Scopa) 
 
 Developed as a project for the Software Engineering course at DTM, University of Bologna.
 
-> **Status:** Phase 3 (adapters). Matazza and Briscola are playable offline against bots from the command line; finished matches can be stored in SQLite, with history and statistics. A REST API (`/api/v1`) registers players, serves their match history and statistics, and lets a registered player play a match against bots. The lobby and the web client are not built yet.
+> **Status:** Phase 3 (adapters). Matazza and Briscola are playable offline against bots from the command line; finished matches can be stored in SQLite, with history and statistics. A REST API (`/api/v1`) registers players, serves their match history and statistics, and lets a registered player play a match against bots. The lobby domain (join codes, seats, creator-only start with bot fill) exists but is not exposed by the API yet, and the web client is not built.
 
 ## Project structure
 
@@ -13,11 +13,11 @@ Developed as a project for the Software Engineering course at DTM, University of
 ├── italian_card_games/     # main package
 │   ├── engine/             # game rules and match flow (framework-free)
 │   ├── history/            # match records, history and statistics (framework-free)
-│   ├── lobby/              # nicknames and registered players (framework-free)
+│   ├── lobby/              # nicknames, registered players, lobbies and join codes (framework-free)
 │   ├── play/               # offline matches against bots: service and session (framework-free)
 │   ├── api/                # REST API (FastAPI): routes on the ports, composition root in main.py
 │   ├── ai/                 # bot strategies (adapters behind AIStrategy)
-│   ├── persistence/        # MatchRepository, PlayerRepository and SessionStore adapters: in-memory and SQLite (SQLAlchemy)
+│   ├── persistence/        # MatchRepository, PlayerRepository, LobbyRepository and SessionStore adapters: in-memory and SQLite (SQLAlchemy)
 │   ├── cli.py              # offline command-line game
 │   ├── __init__.py         # python package marker
 │   └── __main__.py         # application entry point

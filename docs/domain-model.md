@@ -107,16 +107,17 @@ Design choices:
 | Kind | Name | Notes |
 |---|---|---|
 | Value object | `Nickname` | A trimmed text of 3 to 20 letters, digits, `_` or `-`, validated on creation (FR-26). `value` keeps the casing the player chose; `key` is its lower-case form, and equality and hash use `key`, so `Davide` and `davide` are the same name. |
-| Value object | `JoinCode` | *Planned, not in code yet.* Validated on creation. Comes with the lobby. |
-| Value object | `Occupant` | *Planned.* Human (with a nickname) or bot. |
-| Entity | `Seat` | *Planned.* Identity: its position in the lobby. Holds an occupant or is empty. |
+| Value object | `JoinCode` | FR-27. Exactly 6 characters from an alphabet without the look-alikes `0`, `1`, `O` and `I`; trimmed and upper-cased on creation, so `abc234` equals `ABC234`. `JoinCode.random(rng)` draws a code from an injected `Random`. |
+| Value object | `Occupant` | A human (`Occupant.human(nickname)`) or a bot (`Occupant.bot()`). A bot has no name of its own: the code that builds the match names it by seat (`Bot 1`, ...). |
+| Entity | `Seat` | Identity: its `SeatIndex` position in the lobby. Holds an occupant or is empty (`is_empty`). Mutable: the lobby fills and clears it. |
 | **Aggregate root** | `RegisteredPlayer` | Identity: its `Nickname`. A frozen dataclass; the registry is the way in, so a nickname exists once (FR-26). There is no ownership check: anyone who enters a registered nickname can use it. |
-| **Aggregate root** | `Lobby` | *Planned.* Identity: its join code. Controls joining, leaving, bot fill, and starting a match. Only registered players can join. |
+| **Aggregate root** | `Lobby` | Identity: its `JoinCode`. Built with a game id, a seat count and a creator, who takes seat 0. `join` takes the lowest empty seat, `leave` frees a seat, `fill_with_bots` fills the empty ones and `start` returns the occupants in seat order. It knows no game rules and does not check that a nickname is registered: the API does that through the registry. Errors derive from `LobbyError` (a `ValueError`): `AlreadyJoinedError`, `LobbyFullError`, `LobbyStartedError`, `NotCreatorError`, `NotInLobbyError`. |
 | Domain service | `NicknameRegistry` | `register(nickname)` stores a new player and raises `NicknameTakenError` (a `ValueError`) if the name is taken in any case; `find(nickname)` returns the player or `None`. Uniqueness spans all players, so it cannot live inside a single `RegisteredPlayer`. It does not check first and then add: it relies on the repository's rejection, so two racing registrations cannot both succeed. |
-| Factory | `LobbyFactory` | *Planned.* Creates a lobby with a fresh join code from an injectable generator. |
+| Factory | `LobbyFactory` | `create(game_id, player_count, creator)` builds a lobby with a fresh code from an injected `Callable[[], JoinCode]`. It does not check that the code is unused: the repository rejects a duplicate and the caller asks for a new lobby. |
 | Repository (port) | `PlayerRepository` | A `typing.Protocol`: `add` (a nickname taken in any case raises `ValueError`) and `get` by nickname, ignoring case and returning the stored casing. Adapters in `persistence/`: `InMemoryPlayerRepository` and `SqlPlayerRepository` (SQLite via SQLAlchemy). Every adapter passes the same contract tests. |
-| Repository (port) | `LobbyRepository` | *Planned.* Lobbies are short-lived, so an in-memory adapter is enough. |
+| Repository (port) | `LobbyRepository` | A `typing.Protocol`: `add` (a code already in use raises `ValueError`), `get` by code (`None` if unknown) and `remove` (an unknown code does nothing). Lobbies are short-lived, so `InMemoryLobbyRepository` in `persistence/` is enough; it returns the same live object and passes the shared contract tests. |
 
+- **The creator starts, and the lobby hands back occupants.** Only the creator can `start`; empty seats then fill with bots (FR-28). If the creator leaves, the next human by seat order becomes the creator, and a lobby with no humans is `is_empty` (the API will delete it). After `start` the lobby rejects joins, leaves and a second start. `start` returns `Occupant`s, not history `Participant`s, because `lobby/` must not import `history/`; the code that builds the match names the bots and creates the participants.
 - **Registering and selecting are two operations.** A new player registers (`register`, rejected if taken). A returning player is looked up (`find`); with no ownership check, no proof is asked.
 - **Case-insensitive uniqueness.** The `Nickname` key is what makes a name taken. In SQLite the `players` table has the lower-case key as its primary key and the chosen casing in a second column, so the database enforces uniqueness even if two registrations race.
 - **Lobby depends on Gameplay only.** `lobby/` imports nothing from `history/` or the adapters, and `engine/` and `history/` do not import it. This is checked by `tests/test_architecture.py` (NFR-01).
@@ -310,14 +311,17 @@ classDiagram
         +join(nickname)
         +leave(nickname)
         +fill_with_bots()
-        +start() Match
+        +start(requested_by) tuple~Occupant~
     }
     class Seat {
         <<entity>>
-        +int position
+        +SeatIndex position
+        +Occupant occupant
     }
     class Occupant {
         <<value object>>
+        +Nickname nickname
+        +is_bot bool
     }
     class Nickname {
         <<value object>>
@@ -350,6 +354,15 @@ classDiagram
     }
     class JoinCode {
         <<value object>>
+        +str value
+        +random(rng) JoinCode
+    }
+    class LobbyFactory {
+        <<factory>>
+        +create(game_id, player_count, creator) Lobby
+    }
+    class InMemoryLobbyRepository {
+        <<adapter>>
     }
     class MatchRecord {
         <<aggregate root>>
@@ -409,6 +422,9 @@ classDiagram
     }
     class LobbyRepository {
         <<interface>>
+        +add(lobby)
+        +get(code) Lobby
+        +remove(code)
     }
 
     Lobby "1" *-- "n" Seat
@@ -433,6 +449,9 @@ classDiagram
     InMemoryMatchRepository ..|> MatchRepository
     SqlMatchRepository ..|> MatchRepository
     LobbyRepository ..> Lobby
+    InMemoryLobbyRepository ..|> LobbyRepository
+    LobbyFactory ..> Lobby : creates
+    LobbyFactory ..> JoinCode : asks for a fresh
 ```
 
 ## 5. Invariants and where they live
@@ -461,7 +480,10 @@ classDiagram
 | A nickname is 3 to 20 letters, digits, `_` or `-` after trimming. | `Nickname` | FR-26 |
 | Two nicknames that differ only in letter case are the same name. | `Nickname`, through its lower-case `key` | FR-26 |
 | A nickname is registered at most once, in any case. | `NicknameRegistry`, backed by `PlayerRepository.add` in every adapter (checked by the contract tests) and the primary key on the lower-case key in SQLite | FR-26 |
-| A lobby never has more seats than its game requires. *(Derived from FR-27 and FR-28.)* | `Lobby` | FR-27, FR-28 |
+| A lobby never has more seats than its game requires. *(Derived from FR-27 and FR-28.)* | `Lobby`, given the seat count by its caller | FR-27, FR-28 |
+| A join code is 6 characters from an alphabet without `0`, `1`, `O` and `I`, and a lobby is stored under a code at most once. | `JoinCode`; `LobbyRepository.add` in every adapter (checked by the contract tests) | FR-27 |
+| A nickname holds at most one seat in a lobby, in any letter case. | `Lobby` | FR-27 |
+| Only the creator starts the match, once; a started lobby no longer changes. | `Lobby` | FR-28 |
 | The core has no dependency on FastAPI, NiceGUI or SQLAlchemy. `engine/` imports none of our other packages, `history/` and `lobby/` import only `engine/`, and `play/` imports only `engine/` and `history/`. `api/` depends on ports and may use FastAPI and Pydantic; only `api/main.py` imports SQLAlchemy or an adapter, and nothing in `api/` imports the CLI. | Package structure, checked statically by `tests/test_architecture.py` | NFR-01 |
 
 ## 6. Open questions
