@@ -1,4 +1,6 @@
 from italian_card_games.history.records import MatchId, MatchRecord
+from italian_card_games.lobby.join_code import JoinCode
+from italian_card_games.lobby.lobby import Lobby
 from italian_card_games.lobby.nickname import Nickname
 from italian_card_games.lobby.player import RegisteredPlayer
 from italian_card_games.play.session import MatchSession
@@ -56,3 +58,21 @@ class InMemorySessionStore:
 
     def get(self, match_id: MatchId) -> MatchSession | None:
         return self._sessions.get(match_id)
+
+
+class InMemoryLobbyRepository:
+    """A LobbyRepository kept in a dict. Lobbies do not survive a restart."""
+
+    def __init__(self) -> None:
+        self._lobbies: dict[JoinCode, Lobby] = {}
+
+    def add(self, lobby: Lobby) -> None:
+        if lobby.code in self._lobbies:
+            raise ValueError(f"join code {lobby.code.value} is already in use")
+        self._lobbies[lobby.code] = lobby
+
+    def get(self, code: JoinCode) -> Lobby | None:
+        return self._lobbies.get(code)
+
+    def remove(self, code: JoinCode) -> None:
+        self._lobbies.pop(code, None)
